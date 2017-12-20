@@ -82,4 +82,4 @@ messages created before this `start_date` will not be synced.
 
 ---
 
-Copyright &copy; 2017 Fishtown Analytics
+Copyright &copy; 2017 Stitch
