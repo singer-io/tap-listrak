@@ -1,8 +1,13 @@
 import zeep
+import sys
+import singer
 from singer import metrics
+from zeep.exceptions import Fault
+import backoff
+
+LOGGER = singer.get_logger()
 
 WSDL = "https://webservices.listrak.com/v31/IntegrationService.asmx?wsdl"
-
 
 def get_client(config):
     client = zeep.Client(wsdl=WSDL)
@@ -11,9 +16,19 @@ def get_client(config):
     client.set_default_soapheaders([headers])
     return client
 
+def log_retry_attempt(details):
+    _, exception, _ = sys.exc_info()
+    LOGGER.info(exception)
+    LOGGER.info('Caught retryable error after %s tries. Message: %s. Waiting %s more seconds then retrying...',
+                details["tries"],
+                exception.message,
+                details["wait"])
 
+@backoff.on_exception(backoff.expo, Fault, max_tries=10, factor=2, on_backoff=log_retry_attempt)
 def request(tap_stream_id, service_fn, **kwargs):
     with metrics.http_request_timer(tap_stream_id) as timer:
         response = service_fn(**kwargs)
         timer.tags[metrics.Tag.http_status_code] = 200
+        timer.tags['params'] = kwargs.get('params')
+
     return response

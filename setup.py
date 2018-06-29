@@ -13,6 +13,7 @@ setup(
         "singer-python==5.0.3",
         "requests",
         "zeep",
+        'backoff==1.3.2',
     ],
     entry_points="""
     [console_scripts]
