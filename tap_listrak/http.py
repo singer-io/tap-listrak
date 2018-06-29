@@ -29,6 +29,7 @@ def request(tap_stream_id, service_fn, **kwargs):
     with metrics.http_request_timer(tap_stream_id) as timer:
         response = service_fn(**kwargs)
         timer.tags[metrics.Tag.http_status_code] = 200
-        timer.tags['params'] = kwargs.get('params')
+        LOGGER.info("Making request for message %s page %s with start date: %s",
+                    kwargs.get('MsgID'), kwargs.get('Page'), kwargs.get('StartDate'))
 
     return response
