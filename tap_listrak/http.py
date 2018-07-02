@@ -24,12 +24,16 @@ def log_retry_attempt(details):
                 exception.message,
                 details["wait"])
 
-@backoff.on_exception(backoff.expo, Fault, max_tries=10, factor=2, on_backoff=log_retry_attempt)
 def request(tap_stream_id, service_fn, **kwargs):
     with metrics.http_request_timer(tap_stream_id) as timer:
-        response = service_fn(**kwargs)
-        timer.tags[metrics.Tag.http_status_code] = 200
-        LOGGER.info("Making request for message %s page %s with start date: %s",
-                    kwargs.get('MsgID'), kwargs.get('Page'), kwargs.get('StartDate'))
+        try:
+            response = service_fn(**kwargs)
+            timer.tags[metrics.Tag.http_status_code] = 200
+            LOGGER.info("Making request for message %s page %s with start date: %s",
+                        kwargs.get('MsgID'), kwargs.get('Page'), kwargs.get('StartDate'))
+        except Fault as e:
+            if "404 - File or directory not found." in str(e.detail):
+                LOGGER.info("Encountered a 404 for message: %s", kwargs['MsgID'])
+                return None
 
     return response
