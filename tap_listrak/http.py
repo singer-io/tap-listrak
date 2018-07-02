@@ -32,7 +32,7 @@ def request(tap_stream_id, service_fn, **kwargs):
             LOGGER.info("Making request for message %s page %s with start date: %s",
                         kwargs.get('MsgID'), kwargs.get('Page'), kwargs.get('StartDate'))
         except Fault as e:
-            if "404 - File or directory not found." in str(e.detail):
+            if "404" in str(e.detail):
                 LOGGER.info("Encountered a 404 for message: %s", kwargs['MsgID'])
                 return None
 
