@@ -36,4 +36,4 @@ def request(tap_stream_id, service_fn, **kwargs):
                 LOGGER.info("Encountered a 404 for message: %s", kwargs['MsgID'])
                 return None
 
-    return response
+        return response
