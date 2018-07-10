@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.5
+  * Fixes an error with raising exceptions on a 404 [#3](https://github.com/singer-io/tap-listrak/pull/3)
+
 ## 1.0.4
   * Fixes indentation in http request function
 
