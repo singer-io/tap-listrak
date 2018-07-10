@@ -31,9 +31,9 @@ def request(tap_stream_id, service_fn, **kwargs):
             timer.tags[metrics.Tag.http_status_code] = 200
             LOGGER.info("Making request for message %s page %s with start date: %s",
                         kwargs.get('MsgID'), kwargs.get('Page'), kwargs.get('StartDate'))
+            return response
         except Fault as e:
             if "404" in str(e.detail):
                 LOGGER.info("Encountered a 404 for message: %s", kwargs['MsgID'])
                 return None
-
-        return response
+            raise
