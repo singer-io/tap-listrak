@@ -1,160 +1,130 @@
 {
+  "type": "object",
   "additionalProperties": false,
   "properties": {
-    "ListID": {
+    "listId": {
       "type": [
-        "null",
         "integer"
       ]
     },
-    "EnableGoogleAnalytics": {
+    "listName": {
       "type": [
-        "null",
-        "boolean"
+        "string"
       ]
     },
-    "GoogleTrackingDomains": {
-      "items": {
-        "type": [
-          "null",
-          "string"
-        ]
-      },
+    "folderId": {
       "type": [
-        "null",
-        "array"
+        "integer"
       ]
     },
-    "EnableInternationalization": {
+    "ipPoolId": {
       "type": [
-        "null",
-        "boolean"
+        "integer"
       ]
     },
-    "ListName": {
+    "bounceDomainAlias": {
       "type": [
-        "null",
         "string"
       ]
     },
     "bounceHandling": {
       "type": [
-        "null",
+        "string"
+      ]
+    },
+    "bounceUnsubscribeCount": {
+      "type": [
         "integer"
       ]
     },
-    "CreateDate": {
-      "format": "date-time",
+    "createDate": {
       "type": [
-        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "enableBrowserLink": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableDoubleOptIn": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableDynamicContent": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableGoogleAnalytics": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableInternationalization": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableListHygiene": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableListRemovalHeader": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableListRemovalLink": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableListrakAnalytics": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableSpamScorePersonalization": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableToNamePersonalization": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "fromEmail": {
+      "type": [
         "string"
       ]
     },
-    "ShowEmailList": {
+    "fromName": {
       "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "BounceUnsubscribeCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "EnableRSS": {
-      "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "Vmta": {
-      "additionalProperties": false,
-      "properties": {
-        "Description": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "VmtaID": {
-          "type": [
-            "null",
-            "integer"
-          ]
-        }
-      },
-      "type": [
-        "null",
-        "object"
-      ]
-    },
-    "EnableDoubleOptin": {
-      "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "EnableListHygiene": {
-      "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "DomainAliasLink": {
-      "type": [
-        "null",
         "string"
       ]
     },
-    "EnableListRemoveHeader": {
-      "type": [
-        "null",
-        "boolean"
-      ]
+    "googleTrackingDomains": {
+      "type": "array",
+      "items": {
+        "type": [
+          "string"
+        ]
+      }
     },
-    "EnableDynamicContent": {
+    "linkDomainAlias": {
       "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "EnableBrowserLink": {
-      "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "EnableRemovalLink": {
-      "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "FromName": {
-      "type": [
-        "null",
         "string"
       ]
     },
-    "FromEmail": {
+    "mediaDomainAlias": {
       "type": [
-        "null",
-        "string"
-      ]
-    },
-    "ShowAdvancedPersonalization": {
-      "type": [
-        "null",
-        "boolean"
-      ]
-    },
-    "DomainAliasEmail": {
-      "type": [
-        "null",
         "string"
       ]
     }
-  },
-  "type": "object"
+  }
 }

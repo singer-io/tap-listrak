@@ -1,62 +1,41 @@
 #!/usr/bin/env python3
-import os
-import json
-import singer
-from singer import utils
-from singer.catalog import Catalog, CatalogEntry, Schema
-from . import streams as streams_
-from .context import Context
-from . import schemas
 
-REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
+import json
+import sys
+
+import singer
+from singer import metadata
+
+from tap_listrak.client import ListrakClient
+from tap_listrak.discover import discover
+from tap_listrak.sync import sync
+
 LOGGER = singer.get_logger()
 
+REQUIRED_CONFIG_KEYS = [
+    'start_date',
+    'client_id',
+    'client_secret'
+]
 
-def check_credentials_are_authorized(ctx):
-    pass
+def do_discover(client):
+    LOGGER.info('Starting discover')
+    catalog = discover()
+    json.dump(catalog.to_dict(), sys.stdout, indent=2)
+    LOGGER.info('Finished discover')
 
-
-def discover(ctx):
-    check_credentials_are_authorized(ctx)
-    catalog = Catalog([])
-    for tap_stream_id in schemas.stream_ids:
-        schema = Schema.from_dict(schemas.load_schema(tap_stream_id),
-                                  inclusion="automatic")
-        schema.selected = True if tap_stream_id in ['lists', 'messages'] else False
-        catalog.streams.append(CatalogEntry(
-            stream=tap_stream_id,
-            tap_stream_id=tap_stream_id,
-            key_properties=schemas.PK_FIELDS[tap_stream_id],
-            schema=schema,
-        ))
-    return catalog
-
-
-def sync(ctx):
-    for tap_stream_id in ctx.selected_stream_ids:
-        schemas.load_and_write_schema(tap_stream_id)
-    streams_.sync_lists(ctx)
-    ctx.write_state()
-
-
-def main_impl():
-    args = utils.parse_args(REQUIRED_CONFIG_KEYS)
-    ctx = Context(args.config, args.state)
-    if args.discover:
-        discover(ctx).dump()
-        print()
-    else:
-        ctx.catalog = Catalog.from_dict(args.properties) \
-            if args.properties else discover(ctx)
-        sync(ctx)
-
-
+@singer.utils.handle_top_exception(LOGGER)
 def main():
-    try:
-        main_impl()
-    except Exception as exc:
-        LOGGER.critical(exc)
-        raise
+    parsed_args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
 
-if __name__ == "__main__":
-    main()
+    with ListrakClient(
+        parsed_args.config['client_id'],
+        parsed_args.config['client_secret']) as client:
+
+        if parsed_args.discover:
+            do_discover(client)
+        elif parsed_args.catalog:
+            sync(client,
+                 parsed_args.catalog,
+                 parsed_args.state,
+                 parsed_args.config['start_date'])
