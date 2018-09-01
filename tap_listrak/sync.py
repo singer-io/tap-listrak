@@ -50,14 +50,14 @@ def get_selected_streams(catalog):
     return list(selected_streams)
 
 def sync_lists(client, catalog, persist):
-    lists, _ = client.get('/List')
+    lists, _ = client.get('/List', endpoint='lists')
     if persist:
         write_schema(catalog, 'lists')
         persist_records(catalog, 'lists', lists)
     return lists
 
 def sync_campaigns(client, catalog, list_id):
-    campaigns, _ = client.get('/List/{}/Campaign'.format(list_id))
+    campaigns, _ = client.get('/List/{}/Campaign'.format(list_id), endpoint='campaigns')
     def transform_campaign(row):
         row['listId'] = list_id
         return row
@@ -73,7 +73,8 @@ def sync_contact_page(client, list_id, subscription_state, start_date, next_toke
             'subscriptionState': subscription_state,
             'startDate': start_date,
             'count': 5000
-        })
+        },
+        endpoint='contacts')
 
 def get_contacts_bookmark(state, list_id, contact_state, start_date):
     return nested_get(state, ['bookmarks', list_id, 'contacts', contact_state], start_date)
@@ -88,6 +89,9 @@ def sync_contacts_subscription_state(state, client, catalog, start_date, list_id
     else:
         date_key = 'unsubscribeDate'
 
+    def contacts_transform(contact):
+        contact['listId'] = list_id
+
     max_date = start_date
     next_token = 'Start'
     while next_token is not None:
@@ -96,6 +100,7 @@ def sync_contacts_subscription_state(state, client, catalog, start_date, list_id
                                                  subscription_state,
                                                  start_date,
                                                  next_token)
+        contacts = list(map(contacts_transform, contacts))
         persist_records(catalog, 'contacts', contacts)
 
         if contacts:
@@ -125,6 +130,40 @@ def sync_contacts(client, catalog, state, start_date, list_id):
                                      list_id,
                                      'Unsubscribed')
 
+def get_messages(client, list_id, message_ids):
+    messages = []
+    for message_id in message_ids:
+        message, _ = client.get(
+            '/List/{}/Message/{}'.format(list_id, message_id),
+            endpoint='messages')
+        messages.append(message)
+    return messages
+
+def sync_messages(client, catalog, list_id, persist):
+    message_ids = []
+
+    def messages_transform(message):
+        message['listId'] = list_id
+
+    next_token = 'Start'
+    while next_token is not None:
+        messages_list, next_token = client.get(
+            '/List/{}/Message'.format(list_id),
+            params={
+                'cursor': next_token,
+                'count': 5000
+            },
+            endpoint='messages_list')
+        page_message_ids = list(map(lambda x: x['messageId'], messages_list))
+        message_ids += page_message_ids
+
+        if persist:
+            messages = get_messages(client, list_id, page_message_ids)
+            messages = list(map(messages_transform, messages))
+            persist_records(catalog, 'messages', messages)
+
+    return message_ids
+
 def sync(client, catalog, state, start_date):
     selected_streams = get_selected_streams(catalog)
 
@@ -141,4 +180,11 @@ def sync(client, catalog, state, start_date):
 
         if 'contacts' in selected_streams:
             sync_contacts(client, catalog, state, start_date, list_id)
+
+        if ('messages' in selected_streams or
+            'message_activity' in selected_streams or
+            'message_links' in selected_streams or
+            'message_link_clickers' in selected_streams):
+            sync_messages(client, catalog, list_id, 'messages' in selected_streams)
+
         break

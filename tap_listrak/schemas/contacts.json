@@ -2,6 +2,11 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "listId": {
+      "type": [
+        "integer"
+      ]
+    },
     "emailAddress": {
       "type": [
         "string"

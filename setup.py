@@ -10,7 +10,7 @@ setup(name='tap-listrak',
       classifiers=['Programming Language :: Python :: 3 :: Only'],
       py_modules=['tap_listrak'],
       install_requires=[
-          'arrow-0.12.1',
+          'backoff==1.3.2',
           'requests==2.19.1',
           'singer-python==5.2.0'
       ],

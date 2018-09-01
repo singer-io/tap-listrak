@@ -5,8 +5,9 @@ SCHEMAS = None
 
 PKS = {
     'lists': ['listId'],
-    'campaigns': ['listId', 'campaignId'],
-    'contacts': []
+    'campaigns': ['campaignId'],
+    'contacts': [],
+    'messages': ['messageId']
 }
 
 def get_abs_path(path):
