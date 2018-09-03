@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "listId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "messageId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "linkId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "linkDescription": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "linkUrl": {
+      "type": [
+        "string"
+      ]
+    },
+    "clickCount": {
+      "type": [
+        "integer"
+      ]
+    }
+  }
+}

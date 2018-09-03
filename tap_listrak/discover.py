@@ -12,7 +12,7 @@ def discover():
 
         metadata = []
         for field_name in schema_dict['properties'].keys():
-            if field_name in pk:
+            if field_name in pk or field_name == 'listId':
                 inclusion = 'automatic'
             else:
                 inclusion = 'available'

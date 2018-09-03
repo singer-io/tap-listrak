@@ -51,7 +51,7 @@ def get_selected_streams(catalog):
 
 def sync_lists(client, catalog, persist):
     lists, _ = client.get('/List', endpoint='lists')
-    if persist:
+    if lists and persist:
         write_schema(catalog, 'lists')
         persist_records(catalog, 'lists', lists)
     return lists
@@ -62,8 +62,9 @@ def sync_campaigns(client, catalog, list_id):
         row['listId'] = list_id
         return row
     campaigns = map(transform_campaign, campaigns)
-    write_schema(catalog, 'campaigns')
-    persist_records(catalog, 'campaigns', campaigns)
+    if campaigns:
+        write_schema(catalog, 'campaigns')
+        persist_records(catalog, 'campaigns', campaigns)
 
 def sync_contact_page(client, list_id, subscription_state, start_date, next_token):
     return client.get(
@@ -91,6 +92,7 @@ def sync_contacts_subscription_state(state, client, catalog, start_date, list_id
 
     def contacts_transform(contact):
         contact['listId'] = list_id
+        return contact
 
     max_date = start_date
     next_token = 'Start'
@@ -100,10 +102,10 @@ def sync_contacts_subscription_state(state, client, catalog, start_date, list_id
                                                  subscription_state,
                                                  start_date,
                                                  next_token)
-        contacts = list(map(contacts_transform, contacts))
-        persist_records(catalog, 'contacts', contacts)
-
         if contacts:
+            contacts = list(map(contacts_transform, contacts))
+            persist_records(catalog, 'contacts', contacts)
+
             max_data_date = max(contacts, key=lambda x: x[date_key])[date_key]
             if max_data_date > max_date:
                 max_date = max_data_date
@@ -144,6 +146,7 @@ def sync_messages(client, catalog, list_id, persist):
 
     def messages_transform(message):
         message['listId'] = list_id
+        return message
 
     next_token = 'Start'
     while next_token is not None:
@@ -157,12 +160,65 @@ def sync_messages(client, catalog, list_id, persist):
         page_message_ids = list(map(lambda x: x['messageId'], messages_list))
         message_ids += page_message_ids
 
-        if persist:
+        if messages_list and persist:
             messages = get_messages(client, list_id, page_message_ids)
             messages = list(map(messages_transform, messages))
             persist_records(catalog, 'messages', messages)
 
     return message_ids
+
+# def sync_message_activity(client, catalog, state, start_date):
+#     pass
+
+def sync_message_links(client, catalog, list_id, message_id, persist):
+    message_link_ids = []
+
+    def message_links_transform(message_link):
+        message_link['listId'] = message_id
+        message_link['messageId'] = message_id
+        return message_link
+
+    next_token = 'Start'
+    while next_token is not None:
+        message_links, next_token = client.get(
+            '/List/{}/Message/{}/Link'.format(list_id, message_id),
+            params={
+                'cursor': next_token,
+                'count': 5000
+            },
+            endpoint='message_links')
+        message_link_ids += list(map(lambda x: x['linkId'], message_links))
+
+        if message_links and persist:
+            message_links = list(map(message_links_transform, message_links))
+            persist_records(catalog, 'message_links', message_links)
+
+    return message_link_ids
+
+def sync_message_link_clickers(client, catalog, list_id, message_id, message_link_ids):
+    ## TODO: filter by startDate?
+    for message_link_id in message_link_ids:
+        def message_link_clicker_transform(message_link_clicker):
+            message_link_clicker['listId'] = list_id
+            message_link_clicker['messageId'] = message_id
+            message_link_clicker['linkId'] = message_link_id
+            return message_link_clicker
+
+        next_token = 'Start'
+        while next_token is not None:
+            message_link_clickers, next_token = client.get(
+                '/List/{}/Message/{}/Link/{}/Clicker'.format(
+                    list_id,
+                    message_id,
+                    message_link_id),
+                params={
+                    'cursor': next_token,
+                    'count': 5000
+                },
+                endpoint='message_link_clickers')
+            if message_link_clickers:
+                message_link_clickers = list(map(message_link_clicker_transform, message_link_clickers))
+                persist_records(catalog, 'message_link_clickers', message_link_clickers)
 
 def sync(client, catalog, state, start_date):
     selected_streams = get_selected_streams(catalog)
@@ -185,6 +241,25 @@ def sync(client, catalog, state, start_date):
             'message_activity' in selected_streams or
             'message_links' in selected_streams or
             'message_link_clickers' in selected_streams):
-            sync_messages(client, catalog, list_id, 'messages' in selected_streams)
+            message_ids = sync_messages(client, catalog, list_id, 'messages' in selected_streams)
+
+            for message_id in message_ids:
+                # if 'message_activity' in selected_streams:
+                #     sync_message_activity(client, catalog, state, start_date)
+
+                if ('message_links' in selected_streams or
+                    'message_link_clickers' in selected_streams):
+                    message_link_ids = sync_message_links(client,
+                                                          catalog,
+                                                          list_id,
+                                                          message_id,
+                                                          'message_links' in selected_streams)
+
+                if 'message_link_clickers' in selected_streams:
+                    sync_message_link_clickers(client,
+                                               catalog,
+                                               list_id,
+                                               message_id,
+                                               message_link_ids)
 
         break
