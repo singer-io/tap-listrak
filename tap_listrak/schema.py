@@ -9,7 +9,10 @@ PKS = {
     'contacts': [],
     'messages': ['messageId'],
     'message_links': ['linkId'],
-    'message_link_clickers': ['linkId', 'emailAddress', 'clickDate']
+    'message_link_clickers': ['linkId', 'emailAddress', 'clickDate'],
+    'conversations': ['conversationId'],
+    'conversation_messages': ['messageId'],
+    'transactional_messages': ['transactionalMessageId']
 }
 
 def get_abs_path(path):

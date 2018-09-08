@@ -1,0 +1,38 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "listId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "conversationId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "conversationName": {
+      "type": [
+        "string"
+      ]
+    },
+    "campaignId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "expirationDate": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "status": {
+      "type": [
+        "string"
+      ]
+    }
+  }
+}

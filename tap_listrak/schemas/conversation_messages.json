@@ -1,0 +1,147 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "listId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "conversationId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "messageId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "sendDate": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "campaignId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "bodyHtml": {
+      "type": [
+        "string"
+      ]
+    },
+    "bodyText": {
+      "type": [
+        "string"
+      ]
+    },
+    "codePage": {
+      "type": [
+        "integer"
+      ]
+    },
+    "enablePassalong": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "enableTracking": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "fromEmail": {
+      "type": [
+        "string"
+      ]
+    },
+    "fromName": {
+      "type": [
+        "string"
+      ]
+    },
+    "googleAnalyticsCampaignName": {
+      "type": [
+        "string"
+      ]
+    },
+    "googleAnalyticsCampaignContent": {
+      "type": [
+        "string"
+      ]
+    },
+    "replyEmail": {
+      "type": [
+        "string"
+      ]
+    },
+    "savedAudienceId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "subject": {
+      "type": [
+        "string"
+      ]
+    },
+    "filter": {
+      "$ref": "#/definitions/filter"
+    },
+    "toName": {
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "definitions": {
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "segmentationFieldGroup": {
+          "type": [
+            "string"
+          ]
+        },
+            "segmentationField": {
+          "type": [
+            "string"
+          ]
+        },
+        "joinType": {
+          "type": [
+            "string"
+          ]
+        },
+        "compareType": {
+          "type": [
+            "string"
+          ]
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/filter"
+          }
+        }
+      }
+    }
+  }
+}

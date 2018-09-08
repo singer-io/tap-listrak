@@ -220,6 +220,85 @@ def sync_message_link_clickers(client, catalog, list_id, message_id, message_lin
                 message_link_clickers = list(map(message_link_clicker_transform, message_link_clickers))
                 persist_records(catalog, 'message_link_clickers', message_link_clickers)
 
+def sync_conversations(client, catalog, list_id, persist):
+    conversations, _ = client.get(
+        '/List/{}/Conversation'.format(list_id),
+        endpoint='conversations')
+
+    if conversations and persist:
+        def transform_conversation(conversation):
+            conversation['listId'] = list_id
+            return conversation
+        conversations = list(map(transform_conversation, conversations))
+        persist_records(catalog, 'conversations', conversations)
+
+    return list(map(lambda x: x['conversationId'], conversations))
+
+def sync_conversation_messages(client, catalog, list_id, conversation_id, persist):
+    def transform_message(message):
+        message['listId'] = list_id
+        message['conversationId'] = conversation_id
+        return message
+
+    next_token = 'Start'
+    while next_token is not None:
+        conversation_messages, next_token = client.get(
+            '/List/{}/Conversation/{}/Message'.format(
+                list_id,
+                conversation_id),
+            params={
+                'cursor': next_token,
+                'count': 5000
+            },
+            endpoint='conversation_messages')
+
+        message_ids = list(map(lambda x: x['messageId'], conversation_messages))
+
+        if message_ids and persist:
+            messages = []
+            for message_id in message_ids:
+                message, _ = client.get(
+                    '/List/{}/Conversation/{}/Message/{}'.format(
+                        list_id,
+                        conversation_id,
+                        message_id),
+                    endpoint='conversation_message')
+                messages.append(message)
+
+            messages = list(map(transform_message, messages))
+            persist_records(catalog, 'conversation_messages', messages)
+
+        for message_id in message_ids:
+            yield message_id
+
+def sync_conversation_message_activity(client,
+                                       catalog,
+                                       list_id,
+                                       conversation_id,
+                                       conversation_message_id,
+                                       persist):
+    pass
+
+def sync_transactional_messages(client, catalog, list_id):
+    transactional_messages, _ = client.get(
+        '/List/{}/TransactionalMessage'.format(list_id),
+        endpoint='transactional_messages')
+
+    def transform_transactional_message(transactional_message):
+        transactional_message['listId'] = list_id
+        return transactional_message
+
+    transactional_messages = list(map(transform_transactional_message, transactional_messages))
+    persist_records(catalog, 'transactional_messages', transactional_messages)
+
+def should_sync_stream(stream_and_dependencies, selected_streams):
+    if isinstance(stream_and_dependencies, str):
+        stream_and_dependencies = [stream_and_dependencies]
+    for stream in stream_and_dependencies:
+        if stream in selected_streams:
+            return True
+    return False
+
 def sync(client, catalog, state, start_date):
     selected_streams = get_selected_streams(catalog)
 
@@ -231,35 +310,72 @@ def sync(client, catalog, state, start_date):
     list_ids = map(lambda x: x['listId'], lists)
 
     for list_id in list_ids:
-        if 'campaigns' in selected_streams:
+        if should_sync_stream('campaigns', selected_streams):
             sync_campaigns(client, catalog, list_id)
 
-        if 'contacts' in selected_streams:
+        if should_sync_stream('contacts', selected_streams):
             sync_contacts(client, catalog, state, start_date, list_id)
 
-        if ('messages' in selected_streams or
-            'message_activity' in selected_streams or
-            'message_links' in selected_streams or
-            'message_link_clickers' in selected_streams):
+        if should_sync_stream(
+            [
+                'messages',
+                'message_activity',
+                'message_links',
+                'message_link_clickers'
+            ],
+            selected_streams):
+            ## TODO: yield message ids?
             message_ids = sync_messages(client, catalog, list_id, 'messages' in selected_streams)
 
             for message_id in message_ids:
                 # if 'message_activity' in selected_streams:
                 #     sync_message_activity(client, catalog, state, start_date)
 
-                if ('message_links' in selected_streams or
-                    'message_link_clickers' in selected_streams):
+                if should_sync_stream(['message_links', 'message_link_clickers'],
+                                      selected_streams):
                     message_link_ids = sync_message_links(client,
                                                           catalog,
                                                           list_id,
                                                           message_id,
                                                           'message_links' in selected_streams)
 
-                if 'message_link_clickers' in selected_streams:
+                if should_sync_stream('message_link_clickers', selected_streams):
                     sync_message_link_clickers(client,
                                                catalog,
                                                list_id,
                                                message_id,
                                                message_link_ids)
 
-        break
+        if should_sync_stream(
+            [
+                'conversations',
+                'conversation_messages',
+                'conversation_message_activity'
+            ],
+            selected_streams):
+            conversation_ids = sync_conversations(client,
+                                                  catalog,
+                                                  list_id,
+                                                  'conversations' in selected_streams)
+
+            if should_sync_stream(['conversation_messages', 'conversation_message_activity'], selected_streams): 
+                for conversation_id in conversation_ids:
+                    message_ids = sync_conversation_messages(client,
+                                                             catalog,
+                                                             list_id,
+                                                             conversation_id,
+                                                             'conversation_messages' in selected_streams)
+
+                    if should_sync_stream('conversation_message_activity', selected_streams):
+                        for conversation_message_id in message_ids:
+                            sync_conversation_message_activity(client,
+                                                               catalog,
+                                                               list_id,
+                                                               conversation_id,
+                                                               conversation_message_id,
+                                                               persist)
+                    else:
+                        list(message_ids) # force generator eval
+
+        if should_sync_stream('transactional_messages', selected_streams):
+            sync_transactional_messages(client, catalog, list_id)
