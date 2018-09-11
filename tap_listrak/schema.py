@@ -10,8 +10,10 @@ PKS = {
     'messages': ['messageId'],
     'message_links': ['linkId'],
     'message_link_clickers': ['linkId', 'emailAddress', 'clickDate'],
+    'message_activity': [],
     'conversations': ['conversationId'],
     'conversation_messages': ['messageId'],
+    'conversation_message_activity': [],
     'transactional_messages': ['transactionalMessageId']
 }
 

@@ -1,0 +1,87 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "listId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "messageId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "abuse": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "activityDate": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "bounce": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "bounceReason": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "click": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "clickCount": {
+      "type": [
+        "integer"
+      ]
+    },
+    "emailAddress": {
+      "type": [
+        "string"
+      ]
+    },
+    "open": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "orderTotal": {
+      "type": [
+        "integer"
+      ]
+    },
+    "read": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "sendDate": {
+      "type": [
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "unsubscribe": {
+      "type": [
+        "boolean"
+      ]
+    },
+    "visitDate": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    }
+  }
+}

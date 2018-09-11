@@ -142,6 +142,8 @@ def get_messages(client, list_id, message_ids):
     return messages
 
 def sync_messages(client, catalog, list_id, persist):
+    write_schema(catalog, 'messages')
+
     message_ids = []
 
     def messages_transform(message):
@@ -167,10 +169,53 @@ def sync_messages(client, catalog, list_id, persist):
 
     return message_ids
 
-# def sync_message_activity(client, catalog, state, start_date):
-#     pass
+def sync_message_activity(client, catalog, state, start_date, list_id, message_id):
+    write_schema(catalog, 'message_activity')
+
+    bookmark_path = ['bookmarks',
+                     list_id,
+                     'messages',
+                     message_id,
+                     'message_activity']
+    activity_start_date = nested_get(state,
+                                     bookmark_path,
+                                     start_date)
+
+    def activity_transform(activity):
+        activity['listId'] = list_id
+        activity['messageId'] = message_id
+        return activity
+
+    max_date = activity_start_date
+    next_token = 'Start'
+    while next_token is not None:
+        activities, next_token = client.get(
+            '/List/{}/Message/{}/Activity'.format(
+                list_id,
+                message_id),
+            params={
+                'cursor': next_token,
+                'count': 5000,
+                'dateType': 'Activity',
+                'startDate': activity_start_date
+            },
+            endpoint='message_activity')
+
+        if activities:
+            page_max_date = max(filter(lambda x: x is not None,
+                                       map(lambda x: x['activityDate'], activities)))
+            if page_max_date > max_date:
+                max_date = page_max_date
+
+            activities = list(map(activity_transform, activities))
+            persist_records(catalog, 'message_activity', activities)
+
+    nested_set(state, bookmark_path, max_date)
+    singer.write_state(state)
 
 def sync_message_links(client, catalog, list_id, message_id, persist):
+    write_schema(catalog, 'message_links')
+
     message_link_ids = []
 
     def message_links_transform(message_link):
@@ -196,6 +241,8 @@ def sync_message_links(client, catalog, list_id, message_id, persist):
     return message_link_ids
 
 def sync_message_link_clickers(client, catalog, list_id, message_id, message_link_ids):
+    write_schema(catalog, 'message_link_clickers')
+
     ## TODO: filter by startDate?
     for message_link_id in message_link_ids:
         def message_link_clicker_transform(message_link_clicker):
@@ -221,6 +268,8 @@ def sync_message_link_clickers(client, catalog, list_id, message_id, message_lin
                 persist_records(catalog, 'message_link_clickers', message_link_clickers)
 
 def sync_conversations(client, catalog, list_id, persist):
+    write_schema(catalog, 'conversations')
+
     conversations, _ = client.get(
         '/List/{}/Conversation'.format(list_id),
         endpoint='conversations')
@@ -235,6 +284,8 @@ def sync_conversations(client, catalog, list_id, persist):
     return list(map(lambda x: x['conversationId'], conversations))
 
 def sync_conversation_messages(client, catalog, list_id, conversation_id, persist):
+    write_schema(catalog, 'conversation_messages')
+
     def transform_message(message):
         message['listId'] = list_id
         message['conversationId'] = conversation_id
@@ -275,11 +326,35 @@ def sync_conversation_message_activity(client,
                                        catalog,
                                        list_id,
                                        conversation_id,
-                                       conversation_message_id,
-                                       persist):
-    pass
+                                       conversation_message_id):
+    write_schema(catalog, 'conversation_message_activity')
+
+    def transform_message_activity(activity):
+        activity['listId'] = list_id
+        activity['conversationId'] = conversation_id
+        activity['conversationMessageId'] = conversation_message_id
+        return activity
+
+    next_token = 'Start'
+    while next_token is not None:
+        activities, next_token = client.get(
+            '/List/{}/Conversation/{}/Message/{}/Activity'.format(
+                list_id,
+                conversation_id,
+                conversation_message_id),
+            params={
+                'cursor': next_token,
+                'count': 5000
+            },
+            endpoint='conversation_message_activity')
+
+        if activities:
+            activities = list(map(transform_message_activity, activities))
+            persist_records(catalog, 'conversation_message_activity', activities)
 
 def sync_transactional_messages(client, catalog, list_id):
+    write_schema(catalog, 'transactional_messages')
+
     transactional_messages, _ = client.get(
         '/List/{}/TransactionalMessage'.format(list_id),
         endpoint='transactional_messages')
@@ -328,8 +403,8 @@ def sync(client, catalog, state, start_date):
             message_ids = sync_messages(client, catalog, list_id, 'messages' in selected_streams)
 
             for message_id in message_ids:
-                # if 'message_activity' in selected_streams:
-                #     sync_message_activity(client, catalog, state, start_date)
+                if 'message_activity' in selected_streams:
+                    sync_message_activity(client, catalog, state, start_date, list_id, message_id)
 
                 if should_sync_stream(['message_links', 'message_link_clickers'],
                                       selected_streams):
@@ -372,8 +447,7 @@ def sync(client, catalog, state, start_date):
                                                                catalog,
                                                                list_id,
                                                                conversation_id,
-                                                               conversation_message_id,
-                                                               persist)
+                                                               conversation_message_id)
                     else:
                         list(message_ids) # force generator eval
 
