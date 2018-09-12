@@ -2,31 +2,33 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "AdditionDate": {
+    "listId": {
       "type": [
-        "null",
-        "string"
-      ],
-      "format": "date-time"
+        "integer"
+      ]
     },
-    "EmailAddress": {
+    "messageId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "linkId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "linkDescription": {
       "type": [
         "null",
         "string"
       ]
     },
-    "AdditionMethod": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "ContactID": {
+    "linkUrl": {
       "type": [
         "string"
       ]
     },
-    "ListID": {
+    "clickCount": {
       "type": [
         "integer"
       ]

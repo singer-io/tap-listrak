@@ -1,41 +1,38 @@
 {
   "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "MsgID": {
+    "listId": {
       "type": [
         "integer"
       ]
     },
-    "ContactID": {
+    "conversationId": {
       "type": [
-        "null",
+        "integer"
+      ]
+    },
+    "conversationName": {
+      "type": [
         "string"
       ]
     },
-    "EmailAddress": {
+    "campaignId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "expirationDate": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date-time"
     },
-    "LinkUrl": {
+    "status": {
       "type": [
-        "null",
-        "string"
-      ]
-    },
-    "ClickDate": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "LinkDescription": {
-      "type": [
-        "null",
         "string"
       ]
     }
-  },
-  "additionalProperties": false
+  }
 }

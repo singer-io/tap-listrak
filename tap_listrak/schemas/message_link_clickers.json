@@ -1,29 +1,31 @@
 {
   "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "MsgID": {
+    "listId": {
       "type": [
         "integer"
       ]
     },
-    "OpenDate": {
+    "messageId": {
       "type": [
-        "null",
+        "integer"
+      ]
+    },
+    "linkId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "emailAddress": {
+      "type": [
         "string"
       ]
     },
-    "EmailAddress": {
+    "clickDate": {
       "type": [
-        "null",
-        "string"
-      ]
-    },
-    "ContactID": {
-      "type": [
-        "null",
         "string"
       ]
     }
-  },
-  "additionalProperties": false
+  }
 }

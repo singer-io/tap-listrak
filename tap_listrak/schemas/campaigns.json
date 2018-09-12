@@ -1,17 +1,21 @@
 {
+  "type": "object",
   "additionalProperties": false,
   "properties": {
-    "MsgID": {
+    "listId": {
       "type": [
         "integer"
       ]
     },
-    "EmailAddress": {
+    "campaignId": {
       "type": [
-        "null",
+        "integer"
+      ]
+    },
+    "campaignName": {
+      "type": [
         "string"
       ]
     }
-  },
-  "type": "object"
+  }
 }

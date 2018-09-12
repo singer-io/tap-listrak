@@ -1,0 +1,72 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "listId": {
+      "type": [
+        "integer"
+      ]
+    },
+    "emailAddress": {
+      "type": [
+        "string"
+      ]
+    },
+    "emailKey": {
+      "type": [
+        "string"
+      ]
+    },
+    "subscriptionState": {
+      "type": [
+        "string"
+      ]
+    },
+    "subscribeDate": {
+      "type": [
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "subscribeMethod": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "unsubscribeDate": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "unsubscribeMethod": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "segmentationFieldValues": {
+      "type": [
+        "array"
+      ],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "segmentationFieldId": {
+            "type": [
+              "integer"
+            ]
+          },
+          "value": {
+            "type": [
+              "string"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
