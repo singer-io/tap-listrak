@@ -45,7 +45,7 @@ This tap:
    The `start_date` is the date at which the tap will begin pulling data. The
    Listrak API uses a form of OAuth2 Client Credentials Authentication, meaning you must create these credentials in Listrak and provide them.
 
-4. Run the Tap in Discovery Mode
+3. Run the Tap in Discovery Mode
 
 	```sh
    tap-listrak -c config.json --discover
@@ -54,7 +54,7 @@ This tap:
    See the Singer docs on discovery mode
    [here](https://github.com/singer-io/getting-started/blob/master/BEST_PRACTICES.md#discover-mode-and-connection-checks).
 
-5. Run the Tap in Sync Mode
+4. Run the Tap in Sync Mode
 
 	```sh
    tap-listrak -c config.json --catalog catalog-file.json

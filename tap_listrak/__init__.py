@@ -18,7 +18,7 @@ REQUIRED_CONFIG_KEYS = [
     'client_secret'
 ]
 
-def do_discover(client):
+def do_discover():
     LOGGER.info('Starting discover')
     catalog = discover()
     json.dump(catalog.to_dict(), sys.stdout, indent=2)
@@ -28,12 +28,10 @@ def do_discover(client):
 def main():
     parsed_args = singer.utils.parse_args(REQUIRED_CONFIG_KEYS)
 
-    with ListrakClient(
-        parsed_args.config['client_id'],
-        parsed_args.config['client_secret']) as client:
-
+    with ListrakClient(parsed_args.config['client_id'],
+                       parsed_args.config['client_secret']) as client:
         if parsed_args.discover:
-            do_discover(client)
+            do_discover()
         elif parsed_args.catalog:
             sync(client,
                  parsed_args.catalog,

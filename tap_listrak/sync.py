@@ -387,7 +387,7 @@ def sync(client, catalog, state, start_date):
         return
 
     lists = sync_lists(client, catalog, 'lists' in selected_streams)
- 
+
     list_ids = sorted(map(lambda x: x['listId'], lists)) # sort for last_list_id
 
     last_list_id = state.get('last_list_id')
