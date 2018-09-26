@@ -3,6 +3,8 @@ from singer import metrics, metadata, Transformer
 
 from tap_listrak.schema import PKS
 
+LOGGER = singer.get_logger()
+
 def write_schema(catalog, stream_id):
     stream = catalog.get_stream(stream_id)
     schema = stream.schema.to_dict()
@@ -50,6 +52,7 @@ def get_selected_streams(catalog):
     return list(selected_streams)
 
 def sync_lists(client, catalog, persist):
+    LOGGER.info('Syncing lists')
     lists, _ = client.get('/List', endpoint='lists')
     if lists and persist:
         write_schema(catalog, 'lists')
@@ -57,6 +60,7 @@ def sync_lists(client, catalog, persist):
     return lists
 
 def sync_campaigns(client, catalog, list_id):
+    LOGGER.info('List {} - Syncing campaigns'.format(list_id))
     campaigns, _ = client.get('/List/{}/Campaign'.format(list_id), endpoint='campaigns')
     def transform_campaign(row):
         row['listId'] = list_id
@@ -66,7 +70,8 @@ def sync_campaigns(client, catalog, list_id):
         write_schema(catalog, 'campaigns')
         persist_records(catalog, 'campaigns', campaigns)
 
-def sync_contact_page(client, list_id, subscription_state, start_date, next_token):
+def sync_contact_page(client, list_id, subscription_state, start_date, next_token, page_num):
+    LOGGER.info('List {} - Syncing {} contact page - {}'.format(list_id, subscription_state, page_num))
     return client.get(
         '/List/{}/Contact'.format(list_id),
         params={
@@ -95,13 +100,16 @@ def sync_contacts_subscription_state(state, client, catalog, start_date, list_id
         return contact
 
     max_date = start_date
+    page_num = 1
     next_token = 'Start'
     while next_token is not None:
         contacts, next_token = sync_contact_page(client,
                                                  list_id,
                                                  subscription_state,
                                                  start_date,
-                                                 next_token)
+                                                 next_token,
+                                                 page_num)
+        page_num += 1
         if contacts:
             contacts = list(map(contacts_transform, contacts))
             persist_records(catalog, 'contacts', contacts)
@@ -116,6 +124,7 @@ def sync_contacts_subscription_state(state, client, catalog, start_date, list_id
 def sync_contacts(client, catalog, state, start_date, list_id):
     write_schema(catalog, 'contacts')
 
+    LOGGER.info('List {} - Syncing Subscribed contacts'.format(list_id))
     subscribed_last_date = get_contacts_bookmark(state, list_id, 'Subscribed', start_date)
     sync_contacts_subscription_state(state,
                                      client,
@@ -124,6 +133,7 @@ def sync_contacts(client, catalog, state, start_date, list_id):
                                      list_id,
                                      'Subscribed')
 
+    LOGGER.info('List {} - Syncing Unsubscribed contacts'.format(list_id))
     unsubscribed_last_date = get_contacts_bookmark(state, list_id, 'Unsubscribed', start_date)
     sync_contacts_subscription_state(state,
                                      client,
@@ -151,7 +161,9 @@ def sync_messages(client, catalog, list_id, persist):
         return message
 
     next_token = 'Start'
+    page_num = 1
     while next_token is not None:
+        LOGGER.info('List {} - Syncing messages page {}'.format(list_id, page_num))
         messages_list, next_token = client.get(
             '/List/{}/Message'.format(list_id),
             params={
@@ -159,6 +171,7 @@ def sync_messages(client, catalog, list_id, persist):
                 'count': 5000
             },
             endpoint='messages_list')
+        page_num += 1
         page_message_ids = list(map(lambda x: x['messageId'], messages_list))
         message_ids += page_message_ids
 
@@ -186,9 +199,11 @@ def sync_message_activity(client, catalog, state, start_date, list_id, message_i
         activity['messageId'] = message_id
         return activity
 
+    page_num = 1
     max_date = activity_start_date
     next_token = 'Start'
     while next_token is not None:
+        LOGGER.info('List {} - Message {} - Syncing activity since {} - page {}'.format(list_id, message_id, activity_start_date, page_num))
         activities, next_token = client.get(
             '/List/{}/Message/{}/Activity'.format(
                 list_id,
@@ -200,6 +215,8 @@ def sync_message_activity(client, catalog, state, start_date, list_id, message_i
                 'startDate': activity_start_date
             },
             endpoint='message_activity')
+
+        page_num += 1
 
         if activities:
             page_max_date = max(filter(lambda x: x is not None,
@@ -223,8 +240,10 @@ def sync_message_links(client, catalog, list_id, message_id, persist):
         message_link['messageId'] = message_id
         return message_link
 
+    page_num = 1
     next_token = 'Start'
     while next_token is not None:
+        LOGGER.info('List {} - Message {} - Syncing message_links - page {}'.format(list_id, message_id, page_num))
         message_links, next_token = client.get(
             '/List/{}/Message/{}/Link'.format(list_id, message_id),
             params={
@@ -233,6 +252,8 @@ def sync_message_links(client, catalog, list_id, message_id, persist):
             },
             endpoint='message_links')
         message_link_ids += list(map(lambda x: x['linkId'], message_links))
+
+        page_num += 1
 
         if message_links and persist:
             message_links = list(map(message_links_transform, message_links))
@@ -250,8 +271,14 @@ def sync_message_link_clickers(client, catalog, list_id, message_id, message_lin
             message_link_clicker['linkId'] = message_link_id
             return message_link_clicker
 
+        page_num = 1
         next_token = 'Start'
         while next_token is not None:
+            LOGGER.info('List {} - Message {} - Link {} - Syncing message_link_clickers'.format(
+                   list_id,
+                   message_id,
+                   message_link_id,
+                   page_num))
             message_link_clickers, next_token = client.get(
                 '/List/{}/Message/{}/Link/{}/Clicker'.format(
                     list_id,
@@ -262,12 +289,17 @@ def sync_message_link_clickers(client, catalog, list_id, message_id, message_lin
                     'count': 5000
                 },
                 endpoint='message_link_clickers')
+
+            page_num += 1
+
             if message_link_clickers:
                 message_link_clickers = list(map(message_link_clicker_transform, message_link_clickers))
                 persist_records(catalog, 'message_link_clickers', message_link_clickers)
 
 def sync_conversations(client, catalog, list_id, persist):
     write_schema(catalog, 'conversations')
+
+    LOGGER.info('List {} - Syncing conversations'.format(list_id))
 
     conversations, _ = client.get(
         '/List/{}/Conversation'.format(list_id),
@@ -290,8 +322,13 @@ def sync_conversation_messages(client, catalog, list_id, conversation_id, persis
         message['conversationId'] = conversation_id
         return message
 
+    page_num = 1
     next_token = 'Start'
     while next_token is not None:
+        LOGGER.info('List {} - Conversation {} - Syncing conversation_messages - page {}'.format(
+            list_id,
+            conversation_id,
+            page_num))
         conversation_messages, next_token = client.get(
             '/List/{}/Conversation/{}/Message'.format(
                 list_id,
@@ -303,6 +340,8 @@ def sync_conversation_messages(client, catalog, list_id, conversation_id, persis
             endpoint='conversation_messages')
 
         message_ids = list(map(lambda x: x['messageId'], conversation_messages))
+
+        page_num += 1
 
         if message_ids and persist:
             messages = []
@@ -335,7 +374,13 @@ def sync_conversation_message_activity(client,
         return activity
 
     next_token = 'Start'
+    page_num = 1
     while next_token is not None:
+        LOGGER.info('List {} - Conversation {} - Conversation Message {} - Syncing conversation_message_activity page {}'.format(
+            list_id,
+            conversation_id,
+            conversation_message_id,
+            page_num))
         activities, next_token = client.get(
             '/List/{}/Conversation/{}/Message/{}/Activity'.format(
                 list_id,
@@ -347,12 +392,16 @@ def sync_conversation_message_activity(client,
             },
             endpoint='conversation_message_activity')
 
+        page_num += 1
+
         if activities:
             activities = list(map(transform_message_activity, activities))
             persist_records(catalog, 'conversation_message_activity', activities)
 
 def sync_transactional_messages(client, catalog, list_id):
     write_schema(catalog, 'transactional_messages')
+
+    LOGGER.info('List {} - Syncing transactional_messages'.format(list_id))
 
     transactional_messages, _ = client.get(
         '/List/{}/TransactionalMessage'.format(list_id),
