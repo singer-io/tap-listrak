@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.2
+  * Adds more logging to sync mode [#5](https://github.com/singer-io/tap-listrak/pull/5)
+
 ## 2.0.1
   * Upgrade to Listrak REST API [#4](https://github.com/singer-io/tap-listrak/pull/4)
 
