@@ -33,7 +33,9 @@ def main():
         if parsed_args.discover:
             do_discover()
         elif parsed_args.catalog:
+            num_activity_days = int(parsed_args.config.get('num_activity_days', 7))
             sync(client,
                  parsed_args.catalog,
                  parsed_args.state,
-                 parsed_args.config['start_date'])
+                 parsed_args.config['start_date'],
+                 num_activity_days)

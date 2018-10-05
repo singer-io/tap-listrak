@@ -1,3 +1,4 @@
+import pendulum
 import singer
 from singer import metrics, metadata, Transformer
 
@@ -83,10 +84,10 @@ def sync_contact_page(client, list_id, subscription_state, start_date, next_toke
         endpoint='contacts')
 
 def get_contacts_bookmark(state, list_id, contact_state, start_date):
-    return nested_get(state, ['bookmarks', list_id, 'contacts', contact_state], start_date)
+    return nested_get(state, ['bookmarks', str(list_id), 'contacts', contact_state], start_date)
 
 def write_contacts_bookmark(state, list_id, contact_state, max_date):
-    nested_set(state, ['bookmarks', list_id, 'contacts', contact_state], max_date)
+    nested_set(state, ['bookmarks', str(list_id), 'contacts', contact_state], max_date)
     singer.write_state(state)
 
 def sync_contacts_subscription_state(state, client, catalog, start_date, list_id, subscription_state):
@@ -154,8 +155,6 @@ def get_messages(client, list_id, message_ids):
 def sync_messages(client, catalog, list_id, persist):
     write_schema(catalog, 'messages')
 
-    message_ids = []
-
     def messages_transform(message):
         message['listId'] = list_id
         return message
@@ -173,26 +172,38 @@ def sync_messages(client, catalog, list_id, persist):
             endpoint='messages_list')
         page_num += 1
         page_message_ids = list(map(lambda x: x['messageId'], messages_list))
-        message_ids += page_message_ids
 
-        if messages_list and persist:
+        if messages_list:
             messages = get_messages(client, list_id, page_message_ids)
             messages = list(map(messages_transform, messages))
+
+        if messages_list and persist:
             persist_records(catalog, 'messages', messages)
 
-    return message_ids
+        for message in messages:
+            yield message
 
-def sync_message_activity(client, catalog, state, start_date, list_id, message_id):
+def sync_message_activity(client,
+                          catalog,
+                          state,
+                          start_date,
+                          num_activity_days,
+                          list_id,
+                          message):
+    activity_start_date = nested_get(state,
+                                     ['bookmarks', 'message_activity'],
+                                     start_date)
+    send_date = message['sendDate']
+
+    dt_send_date = pendulum.parse(send_date)
+    dt_activity_start_date = pendulum.parse(activity_start_date)
+    if (send_date is None or
+        dt_send_date.diff(dt_activity_start_date).in_days() > num_activity_days):
+        return
+
     write_schema(catalog, 'message_activity')
 
-    bookmark_path = ['bookmarks',
-                     list_id,
-                     'messages',
-                     message_id,
-                     'message_activity']
-    activity_start_date = nested_get(state,
-                                     bookmark_path,
-                                     start_date)
+    message_id = message['messageId']
 
     def activity_transform(activity):
         activity['listId'] = list_id
@@ -200,7 +211,6 @@ def sync_message_activity(client, catalog, state, start_date, list_id, message_i
         return activity
 
     page_num = 1
-    max_date = activity_start_date
     next_token = 'Start'
     while next_token is not None:
         LOGGER.info('List {} - Message {} - Syncing activity since {} - page {}'.format(list_id, message_id, activity_start_date, page_num))
@@ -212,23 +222,15 @@ def sync_message_activity(client, catalog, state, start_date, list_id, message_i
                 'cursor': next_token,
                 'count': 5000,
                 'dateType': 'Activity',
-                'startDate': activity_start_date
+                'startDate': send_date
             },
             endpoint='message_activity')
 
         page_num += 1
 
         if activities:
-            page_max_date = max(filter(lambda x: x is not None,
-                                       map(lambda x: x['activityDate'], activities)))
-            if page_max_date > max_date:
-                max_date = page_max_date
-
             activities = list(map(activity_transform, activities))
             persist_records(catalog, 'message_activity', activities)
-
-    nested_set(state, bookmark_path, max_date)
-    singer.write_state(state)
 
 def sync_message_links(client, catalog, list_id, message_id, persist):
     write_schema(catalog, 'message_links')
@@ -357,15 +359,31 @@ def sync_conversation_messages(client, catalog, list_id, conversation_id, persis
             messages = list(map(transform_message, messages))
             persist_records(catalog, 'conversation_messages', messages)
 
-        for message_id in message_ids:
-            yield message_id
+            for message in messages:
+                yield message
 
 def sync_conversation_message_activity(client,
                                        catalog,
+                                       state,
+                                       start_date,
+                                       num_activity_days,
                                        list_id,
                                        conversation_id,
-                                       conversation_message_id):
+                                       conversation_message):
+    activity_start_date = nested_get(state,
+                                     ['bookmarks', 'conversation_message_activity'],
+                                     start_date)
+    send_date = conversation_message['sendDate']
+
+    dt_send_date = pendulum.parse(send_date)
+    dt_activity_start_date = pendulum.parse(activity_start_date)
+    if (send_date is None or
+        dt_send_date.diff(dt_activity_start_date).in_days() > num_activity_days):
+        return
+
     write_schema(catalog, 'conversation_message_activity')
+
+    conversation_message_id = conversation_message['id']
 
     def transform_message_activity(activity):
         activity['listId'] = list_id
@@ -429,7 +447,7 @@ def update_last_stream(state, stream):
     state['last_stream'] = stream
     singer.write_state(state)
 
-def sync(client, catalog, state, start_date):
+def sync(client, catalog, state, start_date, num_activity_days):
     selected_streams = get_selected_streams(catalog)
 
     if not selected_streams:
@@ -473,11 +491,17 @@ def sync(client, catalog, state, start_date):
             last_stream):
 
             if last_stream is None or last_stream == 'messages':
-                message_ids = sync_messages(client, catalog, list_id, 'messages' in selected_streams)
+                messages = sync_messages(client, catalog, list_id, 'messages' in selected_streams)
 
-                for message_id in message_ids:
+                for message in messages:
                     if 'message_activity' in selected_streams:
-                        sync_message_activity(client, catalog, state, start_date, list_id, message_id)
+                        sync_message_activity(client,
+                                              catalog,
+                                              state,
+                                              start_date,
+                                              num_activity_days,
+                                              list_id,
+                                              message)
 
                     if should_sync_stream(['message_links', 'message_link_clickers'],
                                           selected_streams,
@@ -485,14 +509,14 @@ def sync(client, catalog, state, start_date):
                         message_link_ids = sync_message_links(client,
                                                               catalog,
                                                               list_id,
-                                                              message_id,
+                                                              message['messageId'],
                                                               'message_links' in selected_streams)
 
                     if should_sync_stream('message_link_clickers', selected_streams, None):
                         sync_message_link_clickers(client,
                                                    catalog,
                                                    list_id,
-                                                   message_id,
+                                                   message['messageId'],
                                                    message_link_ids)
 
                 last_stream = None
@@ -513,21 +537,22 @@ def sync(client, catalog, state, start_date):
 
             if should_sync_stream(['conversation_messages', 'conversation_message_activity'], selected_streams, None): 
                 for conversation_id in conversation_ids:
-                    message_ids = sync_conversation_messages(client,
-                                                             catalog,
-                                                             list_id,
-                                                             conversation_id,
-                                                             'conversation_messages' in selected_streams)
+                    messages = sync_conversation_messages(client,
+                                                          catalog,
+                                                          list_id,
+                                                          conversation_id,
+                                                          'conversation_messages' in selected_streams)
 
-                    if should_sync_stream('conversation_message_activity', selected_streams, None):
-                        for conversation_message_id in message_ids:
+                    for conversation_message in messages:
+                        if should_sync_stream('conversation_message_activity', selected_streams, None):
                             sync_conversation_message_activity(client,
                                                                catalog,
+                                                               state,
+                                                               start_date,
+                                                               num_activity_days,
                                                                list_id,
                                                                conversation_id,
-                                                               conversation_message_id)
-                    else:
-                        list(message_ids) # force generator eval
+                                                               conversation_message)
 
             last_stream = None
             update_last_stream(state, 'conversations')
@@ -536,6 +561,15 @@ def sync(client, catalog, state, start_date):
             sync_transactional_messages(client, catalog, list_id)
             last_stream = None
             update_last_stream(state, 'transactional_messages')
+
+    # update all activity bookmark with current date
+    # this needs to happen at the end (above is a loop)
+    nested_set(state,
+               ['bookmarks', 'message_activity'],
+               pendulum.now('UTC').isoformat())
+    nested_set(state,
+               ['bookmarks', 'conversation_message_activity'],
+               pendulum.now('UTC').isoformat())
 
     state['last_list_id'] = None
     update_last_stream(state, None)

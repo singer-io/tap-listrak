@@ -12,6 +12,7 @@ setup(name='tap-listrak',
       install_requires=[
           'backoff==1.3.2',
           'requests==2.19.1',
+          'pendulum==2.0.3',
           'singer-python==5.2.0'
       ],
       entry_points='''
