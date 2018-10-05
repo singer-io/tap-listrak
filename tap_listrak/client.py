@@ -44,7 +44,8 @@ class ListrakClient(object):
             raise Server5xxError()
 
         if response.status_code != 200:
-            raise Exception('Unable to authenticate')
+            raise Exception('Unable to authenticate - Ensure your credentials are correct' +
+                            ' and this IP has been whitelisted in the Listrak admin panel.')
 
         data = response.json()
 
