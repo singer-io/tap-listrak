@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.3
+  * Uses lookback window for syncing activity [#6](https://github.com/singer-io/tap-listrak/pull/6)
+  * Fixes contacts state to use `str` for both storing and retrieving
+
 ## 2.0.2
   * Adds more logging to sync mode [#5](https://github.com/singer-io/tap-listrak/pull/5)
 
