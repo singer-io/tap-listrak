@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.4
+  * Fixes issue introduced in 2.0.3 where `sendDate` can be null on messages [#7](https://github.com/singer-io/tap-listrak/pull/7)
+
 ## 2.0.3
   * Uses lookback window for syncing activity [#6](https://github.com/singer-io/tap-listrak/pull/6)
   * Fixes contacts state to use `str` for both storing and retrieving
