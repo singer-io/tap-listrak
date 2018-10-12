@@ -180,8 +180,9 @@ def sync_messages(client, catalog, list_id, persist):
         if messages_list and persist:
             persist_records(catalog, 'messages', messages)
 
-        for message in messages:
-            yield message
+        if messages_list:
+            for message in messages:
+                yield message
 
 def sync_message_activity(client,
                           catalog,
