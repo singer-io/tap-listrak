@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.5
+  * Fixes issue where tap would error if no messages returned [#8](https://github.com/singer-io/tap-listrak/pull/8)
+
 ## 2.0.4
   * Fixes issue introduced in 2.0.3 where `sendDate` can be null on messages [#7](https://github.com/singer-io/tap-listrak/pull/7)
 
