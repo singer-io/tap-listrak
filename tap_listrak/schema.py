@@ -6,7 +6,7 @@ SCHEMAS = None
 PKS = {
     'lists': ['listId'],
     'campaigns': ['campaignId'],
-    'contacts': [],
+    'contacts': ['listId', 'emailAddress'],
     'messages': ['messageId'],
     'message_links': ['linkId'],
     'message_link_clickers': ['linkId', 'emailAddress', 'clickDate'],
