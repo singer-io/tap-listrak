@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.7
+  * Update version of `requests` to `0.20.0` in response to CVE 2018-18074
+
+## 2.0.6
+  * Update `contacts` in schema to use `listId` and `emailAddress` [#9](https://github.com/singer-io/tap-listrak/pull/9/)
+
 ## 2.0.5
   * Fixes issue where tap would error if no messages returned [#8](https://github.com/singer-io/tap-listrak/pull/8)
 
