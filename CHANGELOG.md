@@ -1,7 +1,7 @@
 # Changelog
 
 ## 2.0.7
-  * Update version of `requests` to `0.20.0` in response to CVE 2018-18074
+  * Update version of `requests` to `2.20.0` in response to CVE 2018-18074
 
 ## 2.0.6
   * Update `contacts` in schema to use `listId` and `emailAddress` [#9](https://github.com/singer-io/tap-listrak/pull/9/)
