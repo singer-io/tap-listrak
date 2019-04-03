@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.8
+  * Add optional param to diff() function so it doesn't take absolute value
+  * Fixes issue where tap was dropping records on historical sync between `start_date` and `now()`
+
 ## 2.0.7
   * Update version of `requests` to `2.20.0` in response to CVE 2018-18074
 
