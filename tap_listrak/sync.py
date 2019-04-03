@@ -199,7 +199,7 @@ def sync_message_activity(client,
     dt_send_date = pendulum.parse(send_date)
     dt_activity_start_date = pendulum.parse(activity_start_date)
     if (send_date is None or
-        dt_send_date.diff(dt_activity_start_date).in_days() > num_activity_days):
+        dt_send_date.diff(dt_activity_start_date, False).in_days() > num_activity_days):
         return
 
     write_schema(catalog, 'message_activity')
