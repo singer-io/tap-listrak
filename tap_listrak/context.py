@@ -2,6 +2,7 @@ from datetime import datetime, date
 import pendulum
 import singer
 from singer import bookmarks as bks_
+from singer import metadata
 from .http import get_client
 
 
@@ -35,7 +36,9 @@ class Context(object):
         self._catalog = catalog
         self.selected_stream_ids = set(
             [s.tap_stream_id for s in catalog.streams
-             if s.is_selected()]
+             if s.is_selected() or metadata.get(metadata.to_map(s.metadata),
+                                                (),
+                                                'inclusion') == 'automatic']
         )
 
     def get_bookmark(self, path):
