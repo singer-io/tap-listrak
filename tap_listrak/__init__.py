@@ -29,7 +29,9 @@ def discover(ctx):
 
         mdata = metadata.to_map(mdata)
 
-
+        # NB: `lists` and `messages` are required for their substreams.
+        # This is an approximation of the initial functionality using
+        # metadata, which marked them as `selected=True` in the schema.
         if tap_stream_id in ['lists', 'messages']:
             mdata = metadata.write(mdata, (), 'inclusion', 'automatic')
 
