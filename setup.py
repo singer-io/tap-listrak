@@ -14,6 +14,7 @@ setup(
         "requests==2.20.0",
         "zeep",
         'backoff==1.8.0',
+        'pendulum==1.2.0',
     ],
     entry_points="""
     [console_scripts]
