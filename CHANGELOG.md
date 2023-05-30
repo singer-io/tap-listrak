@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.1
+  * Dependabot update [#12](https://github.com/singer-io/tap-listrak/pull/12)
+
 ## 1.1.0
   * Switches annotated_schema to metadata [#10](https://github.com/singer-io/tap-listrak/pull/10)
   * Adds explicit dependency on `pendulum` version `1.2.0` as a result of #10 [#11](https://github.com/singer-io/tap-listrak/pull/11)
