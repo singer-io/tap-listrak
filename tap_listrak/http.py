@@ -20,13 +20,10 @@ def get_client(config):
 def log_retry_attempt(details):
     """Log details about a backoff retry attempt."""
     _, exception, _ = sys.exc_info()
-    LOGGER.info(exception)
-    LOGGER.info('Caught retryable error after %s tries. Message: %s. Waiting %s more seconds then retrying...',
-                details["tries"],
-                str(exception),
-                details["wait"])
+    LOGGER.info("Retryable exception: %s", exception)
+    LOGGER.info("Retry attempt %s. Waiting %s seconds before next try...",
+                details["tries"], details["wait"])
 
-# Added backoff retry to handle intermittent 502 errors, invalid XML and SOAP faults
 @backoff.on_exception(
     backoff.expo,
     (XMLSyntaxError, TransportError, Fault),
@@ -44,17 +41,6 @@ def request(tap_stream_id, service_fn, **kwargs):
                         tap_stream_id, kwargs.get('Page'), kwargs.get('StartDate'))
             return response
 
-        # Catch and retry malformed XML responses (often 502 HTML instead of XML)
-        except XMLSyntaxError as e:
-            LOGGER.warning("XMLSyntaxError in stream '%s': %s", tap_stream_id, str(e))
-            raise
-
-        # Catch SOAP Faults (e.g. operation-specific issues) and retry
-        except Fault as e:
-            LOGGER.warning("SOAP Fault in stream '%s': %s", tap_stream_id, str(e))
-            raise
-
-        # Catch low-level network or HTTP issues (e.g. 502/503)
-        except TransportError as e:
-            LOGGER.warning("TransportError in stream '%s': %s", tap_stream_id, str(e))
+        except Exception as e:
+            LOGGER.exception("Unhandled exception in stream '%s' : %s", tap_stream_id, str(e))
             raise
