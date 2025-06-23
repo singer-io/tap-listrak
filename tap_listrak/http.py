@@ -1,5 +1,4 @@
 import zeep
-import sys
 import singer
 from singer import metrics
 from zeep.exceptions import Fault, TransportError, XMLSyntaxError
@@ -19,14 +18,14 @@ def get_client(config):
 
 def log_retry_attempt(details):
     """Log details about a backoff retry attempt."""
-    _, exception, _ = sys.exc_info()
-    LOGGER.info(exception)
-    LOGGER.info('Caught retryable error after %s tries. Message: %s. Waiting %s more seconds then retrying...',
-                details["tries"],
-                str(exception),
-                details["wait"])
+    exception = details.get("exception")
+    LOGGER.warning(
+        "Retry attempt %s due to error: %s. Waiting %s more seconds before retrying...",
+        details["tries"],
+        str(exception),
+        details["wait"]
+    )
 
-# Added backoff retry to handle intermittent 502 errors, invalid XML and SOAP faults
 @backoff.on_exception(
     backoff.expo,
     (XMLSyntaxError, TransportError, Fault),
@@ -35,26 +34,14 @@ def log_retry_attempt(details):
     on_backoff=log_retry_attempt
 )
 def request(tap_stream_id, service_fn, **kwargs):
-    """Make SOAP API request with error handling and retry."""
+    """Make SOAP API request with retry, metrics, and centralized error logging."""
     with metrics.http_request_timer(tap_stream_id) as timer:
-        try:
-            response = service_fn(**kwargs)
-            timer.tags[metrics.Tag.http_status_code] = 200
-            LOGGER.info("Request successful for stream: %s | Page: %s | Start: %s",
-                        tap_stream_id, kwargs.get('Page'), kwargs.get('StartDate'))
-            return response
-
-        # Catch and retry malformed XML responses (often 502 HTML instead of XML)
-        except XMLSyntaxError as e:
-            LOGGER.warning("XMLSyntaxError in stream '%s': %s", tap_stream_id, str(e))
-            raise
-
-        # Catch SOAP Faults (e.g. operation-specific issues) and retry
-        except Fault as e:
-            LOGGER.warning("SOAP Fault in stream '%s': %s", tap_stream_id, str(e))
-            raise
-
-        # Catch low-level network or HTTP issues (e.g. 502/503)
-        except TransportError as e:
-            LOGGER.warning("TransportError in stream '%s': %s", tap_stream_id, str(e))
-            raise
+        response = service_fn(**kwargs)
+        timer.tags[metrics.Tag.http_status_code] = 200
+        LOGGER.info(
+            "Request successful for stream: %s | Page: %s | Start: %s",
+            tap_stream_id,
+            kwargs.get('Page', 'N/A'),
+            kwargs.get('StartDate', 'N/A')
+        )
+        return response
