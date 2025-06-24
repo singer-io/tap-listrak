@@ -1,83 +1,89 @@
-import unittest
-from unittest.mock import patch, MagicMock
+import pytest
+from unittest.mock import MagicMock, patch
 from zeep.exceptions import XMLSyntaxError, Fault, TransportError
 from tap_listrak.http import request
 
+MAX_RETRIES = 5
 
-class TestRequestFunction(unittest.TestCase):
-    """
-    Unit tests for `request` function in tap_listrak.http module.
 
-    Reviewer Feedback Covered:
-    - Tests now validate retry logic in addition to error handling.
-    - Removed '__main__' block (not required for CI runners like pytest/nose).
-    """
+@pytest.fixture
+def mock_http_timer():
+    """Patch the http_request_timer context manager."""
+    with patch("tap_listrak.http.metrics.http_request_timer") as mock_timer:
+        mock_context = MagicMock()
+        mock_timer.return_value.__enter__.return_value = mock_context
+        yield mock_timer
 
-    def setUp(self):
-        # Patch http_request_timer to avoid real metric recording
-        patcher = patch('tap_listrak.http.metrics.http_request_timer')
-        self.mock_timer = patcher.start()
-        self.addCleanup(patcher.stop)
-        self.mock_timer.return_value.__enter__.return_value = MagicMock(tags={})
 
-    def test_successful_request(self):
-        """Test that request returns successfully for a valid service call."""
-        def mock_service_fn(**kwargs):
-            return "Success"
+def test_successful_request(mock_http_timer):
+    def service_fn(**kwargs):
+        return "Success"
 
-        result = request("test_stream", mock_service_fn)
-        self.assertEqual(result, "Success")
+    result = request("test_stream", service_fn)
+    assert result == "Success"
+    assert mock_http_timer.call_count == 1
 
-    def test_xml_syntax_error(self):
-        """Test that XMLSyntaxError is raised and caught."""
-        def raise_xml_error(**kwargs):
-            raise XMLSyntaxError("Simulated XML syntax issue")
 
-        with self.assertRaises(XMLSyntaxError):
-            request("test_stream", raise_xml_error)
+def test_xml_syntax_error_retry(mock_http_timer):
+    failing_mock = MagicMock(side_effect=XMLSyntaxError("Simulated XML error"))
 
-    def test_fault_error(self):
-        """Test that SOAP Fault is raised and handled."""
-        def raise_fault(**kwargs):
-            raise Fault("Simulated SOAP Fault")
+    with pytest.raises(XMLSyntaxError):
+        request("test_stream", failing_mock)
 
-        with self.assertRaises(Fault):
-            request("test_stream", raise_fault)
+    assert failing_mock.call_count == MAX_RETRIES
+    assert mock_http_timer.call_count == MAX_RETRIES
 
-    def test_transport_error(self):
-        """Test that transport-related errors (like 502) are handled."""
-        def raise_transport_error(**kwargs):
-            raise TransportError(502, "Bad Gateway")
 
-        with self.assertRaises(TransportError):
-            request("test_stream", raise_transport_error)
+def test_fault_error_retry(mock_http_timer):
+    failing_mock = MagicMock(side_effect=Fault("Simulated Fault"))
 
-    def test_retry_success_after_failures(self):
-        """
-        Test that request retries and eventually succeeds after transient errors.
+    with pytest.raises(Fault):
+        request("test_stream", failing_mock)
 
-        Covers: Retry logic working correctly before success.
-        """
-        call_count = {"count": 0}
+    assert failing_mock.call_count == MAX_RETRIES
+    assert mock_http_timer.call_count == MAX_RETRIES
 
-        def flaky_service(**kwargs):
-            if call_count["count"] < 2:
-                call_count["count"] += 1
-                raise TransportError(502, "Temporary issue")
-            return "Recovered"
 
-        result = request("test_stream", flaky_service)
-        self.assertEqual(result, "Recovered")
-        self.assertEqual(call_count["count"], 2)  # Ensures retry was triggered
+def test_transport_error_retry(mock_http_timer):
+    failing_mock = MagicMock(side_effect=TransportError(502, "Bad Gateway"))
 
-    def test_retry_stops_after_max_attempts(self):
-        """
-        Test that request gives up after exceeding retry attempts.
+    with pytest.raises(TransportError):
+        request("test_stream", failing_mock)
 
-        Covers: Retry stops after max_tries (5).
-        """
-        def always_fail(**kwargs):
-            raise Fault("Permanent failure")
+    assert failing_mock.call_count == MAX_RETRIES
+    assert mock_http_timer.call_count == MAX_RETRIES
 
-        with self.assertRaises(Fault):
-            request("test_stream", always_fail)
+
+def test_retry_recovers_before_max_attempts(mock_http_timer):
+    service_mock = MagicMock()
+    service_mock.side_effect = [XMLSyntaxError("fail"), "Recovered"]
+
+    result = request("test_stream", service_mock)
+
+    assert result == "Recovered"
+    assert service_mock.call_count == 2
+    assert mock_http_timer.call_count == 2
+
+
+def test_unhandled_exception_not_retried(mock_http_timer):
+    service_mock = MagicMock(side_effect=ValueError("unexpected"))
+
+    with pytest.raises(ValueError):
+        request("test_stream", service_mock)
+
+    assert service_mock.call_count == 1
+    assert mock_http_timer.call_count == 1
+
+
+def test_none_as_service_fn(mock_http_timer):
+    with pytest.raises(TypeError):
+        request("test_stream", None)
+
+
+def test_service_fn_returns_none(mock_http_timer):
+    def service_fn(**kwargs):
+        return None
+
+    result = request("test_stream", service_fn)
+    assert result is None
+    assert mock_http_timer.call_count == 1
