@@ -24,9 +24,8 @@ def discover(ctx):
         schema_dict = schemas.load_schema(tap_stream_id)
         schema = Schema.from_dict(schema_dict)
 
-        mdata = metadata.get_standard_metadata(
-            schema_dict,
-            key_properties=schemas.PK_FIELDS[tap_stream_id])
+        mdata = metadata.get_standard_metadata(schema_dict,
+                                               key_properties=schemas.PK_FIELDS[tap_stream_id])
         
         mdata = metadata.to_map(mdata)
 
