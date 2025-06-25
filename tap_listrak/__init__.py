@@ -12,7 +12,7 @@ REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
 def check_credentials_are_authorized(ctx):
-    pass  # Temporarily disabled due to no credentials
+    pass  # Temporarily disabled due to no available credentials
 
 def discover(ctx):
     # Skip credential check
