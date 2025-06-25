@@ -27,7 +27,7 @@ jobs:
           name: "Run Unit Tests with Pytest"
           command: |
             source /usr/local/share/virtualenvs/tap-listrak/bin/activate
-            pip install pytest coverage
+            pip install pytest coverage pytest-cov
             pip install opentelemetry-api opentelemetry-sdk
 
             mkdir -p test_output
