@@ -1,120 +1,119 @@
 {
-  "additionalProperties": false,
-  "type": "object",
-  "properties": {
-    "ClickCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
+    "type": "object",
+    "properties": {
+        "MsgID": {
+            "type": [
+                "integer"
+            ]
+        },
+        "Subject": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "SendDate": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "OpenCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ClickCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "DeliverCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ConversionCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ClickerCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ClickerPercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "OpenPercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "ReadCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ReadPercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "RemoveCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "RemovePercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "NewClickerCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "RepeatClickerCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "AverageOrderValue": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "OrderTotal": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "ListID": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        }
     },
-    "SendDate": {
-      "type": [
-        "null",
-        "string"
-      ],
-      "format": "date-time"
-    },
-    "OrderTotal": {
-      "type": [
-        "null",
-        "number"
-      ]
-    },
-    "RemovePercent": {
-      "type": [
-        "null",
-        "number"
-      ]
-    },
-    "RemoveCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "ClickerPercent": {
-      "type": [
-        "null",
-        "number"
-      ]
-    },
-    "DeliverCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "ReadCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "Subject": {
-      "type": [
-        "null",
-        "string"
-      ]
-    },
-    "ConversionCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "ListID": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "NewClickerCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "OpenCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "OpenPercent": {
-      "type": [
-        "null",
-        "number"
-      ]
-    },
-    "RepeatClickerCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "MsgID": {
-      "type": [
-        "integer"
-      ]
-    },
-    "ClickerCount": {
-      "type": [
-        "null",
-        "integer"
-      ]
-    },
-    "ReadPercent": {
-      "type": [
-        "null",
-        "number"
-      ]
-    },
-    "AverageOrderValue": {
-      "type": [
-        "null",
-        "number"
-      ]
-    }
-  }
+    "additionalProperties": false
 }

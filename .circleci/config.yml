@@ -17,14 +17,19 @@ jobs:
             pip install -e .[dev]
 
       - run:
+          name: "JSON Validator"
+          command: |
+            stitch-validate-json tap_listrak/schemas/*.json
+
+      - run:
           name: "Run Pylint"
           command: |
             source /usr/local/share/virtualenvs/tap-listrak/bin/activate
             pip install pylint
-            pylint tap_listrak -d C,R,W || true
+            pylint tap_listrak -d C,R,W
 
       - run:
-          name: "Run Unit Tests with Pytest"
+          name: "Unit Tests"
           command: |
             source /usr/local/share/virtualenvs/tap-listrak/bin/activate
             pip install pytest coverage pytest-cov
