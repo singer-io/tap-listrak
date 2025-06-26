@@ -28,7 +28,6 @@ def discover(ctx):
                                                key_properties=schemas.PK_FIELDS[tap_stream_id])
         
         mdata = metadata.to_map(mdata)
-
         # Auto-include critical parent streams
         if tap_stream_id in ['lists', 'messages']:
             mdata = metadata.write(mdata, (), 'inclusion', 'automatic')
