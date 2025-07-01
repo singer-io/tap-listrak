@@ -27,11 +27,13 @@ def discover(ctx):
         mdata = metadata.get_standard_metadata(schema_dict,
                                                key_properties=schemas.PK_FIELDS[tap_stream_id])
         mdata = metadata.to_map(mdata)
-        # Auto-include critical parent streams
+
+        # NB: `lists` and `messages` are required for their substreams.
+        # This is an approximation of the initial functionality using
+        # metadata, which marked them as `selected=True` in the schema.
         if tap_stream_id in ['lists', 'messages']:
             mdata = metadata.write(mdata, (), 'inclusion', 'automatic')
 
-        # Auto-mark each field as "selected": true (if not unsupported)
         for field_name in schema_dict['properties'].keys():
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
