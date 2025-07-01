@@ -11,13 +11,13 @@ from . import schemas
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
+
 def check_credentials_are_authorized(ctx):
-    pass  # Temporarily disabled due to no available credentials
+    pass
+
 
 def discover(ctx):
-    # Skip credential check
-    # check_credentials_are_authorized(ctx)
-
+    check_credentials_are_authorized(ctx)
     catalog = Catalog([])
 
     for tap_stream_id in schemas.stream_ids:
@@ -26,6 +26,7 @@ def discover(ctx):
 
         mdata = metadata.get_standard_metadata(schema_dict,
                                                key_properties=schemas.PK_FIELDS[tap_stream_id])
+
         mdata = metadata.to_map(mdata)
 
         # NB: `lists` and `messages` are required for their substreams.
@@ -37,26 +38,22 @@ def discover(ctx):
         for field_name in schema_dict['properties'].keys():
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
-        md_list = metadata.to_list(mdata)
-        for md in md_list:
-            if md["metadata"].get("inclusion") != "unsupported":
-                md["metadata"]["selected"] = True
-
         catalog.streams.append(CatalogEntry(
             stream=tap_stream_id,
             tap_stream_id=tap_stream_id,
             key_properties=schemas.PK_FIELDS[tap_stream_id],
             schema=schema,
-            metadata=md_list
+            metadata = metadata.to_list(mdata)
         ))
-
     return catalog
+
 
 def sync(ctx):
     for tap_stream_id in ctx.selected_stream_ids:
         schemas.load_and_write_schema(tap_stream_id)
     streams_.sync_lists(ctx)
     ctx.write_state()
+
 
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
@@ -68,6 +65,7 @@ def main_impl():
         ctx.catalog = Catalog.from_dict(args.properties) \
             if args.properties else discover(ctx)
         sync(ctx)
+
 
 def main():
     try:

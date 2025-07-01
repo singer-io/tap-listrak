@@ -1,70 +1,54 @@
 {
+  "additionalProperties": false,
     "type": "object",
     "properties": {
-        "CharacterSetID": {
+        "ClickCount": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
-        "EnablePassalong": {
+        "SendDate": {
             "type": [
                 "null",
                 "string"
+            ],
+            "format": "date-time"
+        },
+        "OrderTotal": {
+            "type": [
+                "null",
+                "number"
             ]
         },
-        "EnableTracking": {
+        "RemovePercent": {
             "type": [
                 "null",
-                "string"
+                "number"
             ]
         },
-        "FromEmailAddress": {
+        "RemoveCount": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
-        "FromName": {
+        "ClickerPercent": {
             "type": [
                 "null",
-                "string"
+                "number"
             ]
         },
-        "GoogleAnalyticsCampaignContent": {
+        "DeliverCount": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
-        "GoogleAnalyticsCampaignName": {
+        "ReadCount": {
             "type": [
                 "null",
-                "string"
-            ]
-        },
-        "HTMLBody": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ListCampaignID": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ListID": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ReplyEmailAddress": {
-            "type": [
-                "null",
-                "string"
+                "integer"
             ]
         },
         "Subject": {
@@ -73,17 +57,64 @@
                 "string"
             ]
         },
-        "TextBody": {
+        "ConversionCount": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
-        "ToName": {
+        "ListID": {
             "type": [
                 "null",
-                "string"
+                "integer"
+            ]
+        },
+        "NewClickerCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "OpenCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "OpenPercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "RepeatClickerCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "MsgID": {
+            "type": [
+                "integer"
+            ]
+        },
+        "ClickerCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ReadPercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "AverageOrderValue": {
+            "type": [
+                "null",
+                "number"
             ]
         }
-    }
+  }
 }

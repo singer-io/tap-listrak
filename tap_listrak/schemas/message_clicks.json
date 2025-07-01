@@ -1,13 +1,6 @@
 {
     "type": "object",
     "properties": {
-        "ClickDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
         "ContactID": {
             "type": [
                 "null",
@@ -20,17 +13,24 @@
                 "string"
             ]
         },
-        "LinkDescription": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
         "LinkUrl": {
             "type": [
                 "null",
                 "string"
             ]
+        },
+        "ClickDate": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "LinkDescription": {
+            "type": [
+                "null",
+                "string"
+            ]
         }
-    }
+    },
+    "additionalProperties": false
 }

@@ -1,43 +1,19 @@
 {
     "type": "object",
     "properties": {
-        "BounceCount": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BouncePercent": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "DeliverCount": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "DeliverPercent": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
         "ListID": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
         "MsgID": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
-        "PassAlongCount": {
+        "Subject": {
             "type": [
                 "null",
                 "string"
@@ -50,11 +26,36 @@
             ],
             "format": "date-time"
         },
-        "Subject": {
+        "DeliverCount": {
             "type": [
                 "null",
-                "string"
+                "integer"
+            ]
+        },
+        "DeliverPercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "BounceCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "BouncePercent": {
+            "type": [
+                "null",
+                "number"
+            ]
+        },
+        "PassAlongCount": {
+            "type": [
+                "null",
+                "integer"
             ]
         }
-    }
+    },
+    "additionalProperties": false
 }

@@ -1,23 +1,80 @@
 {
-    "type": "object",
+  "additionalProperties": false,
     "properties": {
-        "BounceUnsubscribeCount": {
+        "ListID": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "ListName": {
             "type": [
                 "null",
                 "string"
             ]
         },
-        "CreateDate": {
+        "bounceHandling": {
             "type": [
                 "null",
-                "string"
-            ],
-            "format": "date-time"
+                "integer"
+            ]
         },
-        "DomainAliasEmail": {
+        "CreateDate": {
+          "format": "date-time",
             "type": [
                 "null",
                 "string"
+      ]
+        },
+        "ShowEmailList": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "BounceUnsubscribeCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
+        },
+        "Vmta": {
+            "type": [
+                "null",
+        "boolean"
+      ]
+    },
+    "Vmta": {
+      "additionalProperties": false,
+            "properties": {
+                "Description": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                },
+                "VmtaID": {
+                    "type": [
+                        "null",
+                        "integer"
+                    ]
+                }
+            },
+      "type": [
+        "null",
+        "object"
+      ]
+        },
+        "EnableDoubleOptin": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
+        "EnableListHygiene": {
+            "type": [
+                "null",
+                "boolean"
             ]
         },
         "DomainAliasLink": {
@@ -32,28 +89,10 @@
                 "boolean"
             ]
         },
-        "EnableDoubleOptin": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "EnableListHygiene": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
         "EnableRemovalLink": {
             "type": [
                 "null",
                 "boolean"
-            ]
-        },
-        "FromEmail": {
-            "type": [
-                "null",
-                "string"
             ]
         },
         "FromName": {
@@ -62,13 +101,7 @@
                 "string"
             ]
         },
-        "ListID": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ListName": {
+        "FromEmail": {
             "type": [
                 "null",
                 "string"
@@ -80,23 +113,12 @@
                 "boolean"
             ]
         },
-        "ShowEmailList": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "Vmta": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "bounceHandling": {
+        "DomainAliasEmail": {
             "type": [
                 "null",
                 "string"
             ]
         }
-    }
+    },
+  "type": "object"
 }

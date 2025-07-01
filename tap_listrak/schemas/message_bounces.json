@@ -1,31 +1,6 @@
 {
     "type": "object",
     "properties": {
-        "BounceCount": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BounceDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
-        "BounceDetail": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BounceReason": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
         "ContactID": {
             "type": [
                 "null",
@@ -37,6 +12,31 @@
                 "null",
                 "string"
             ]
+        },
+        "BounceReason": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "BounceDetail": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "BounceDate": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "BounceCount": {
+            "type": [
+                "null",
+                "integer"
+            ]
         }
-    }
+    },
+    "additionalProperties": false
 }

@@ -1,13 +1,6 @@
 {
     "type": "object",
     "properties": {
-        "AdditionDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
         "ContactID": {
             "type": [
                 "null",
@@ -19,6 +12,13 @@
                 "null",
                 "string"
             ]
+        },
+        "AdditionDate": {
+            "type": [
+                "null",
+                "string"
+            ],
+            "format": "date-time"
         },
         "RemovalDate": {
             "type": [
@@ -33,5 +33,6 @@
                 "string"
             ]
         }
-    }
+    },
+    "additionalProperties": false
 }

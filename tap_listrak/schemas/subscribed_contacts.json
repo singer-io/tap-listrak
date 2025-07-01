@@ -1,5 +1,6 @@
 {
     "type": "object",
+    "additionalProperties": false,
     "properties": {
         "AdditionDate": {
             "type": [
@@ -7,6 +8,12 @@
                 "string"
             ],
             "format": "date-time"
+        },
+        "EmailAddress": {
+            "type": [
+                "null",
+                "string"
+            ]
         },
         "AdditionMethod": {
             "type": [
@@ -16,14 +23,12 @@
         },
         "ContactID": {
             "type": [
-                "null",
                 "string"
             ]
         },
-        "EmailAddress": {
+        "ListID": {
             "type": [
-                "null",
-                "string"
+                "integer"
             ]
         }
     }
