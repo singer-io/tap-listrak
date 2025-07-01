@@ -1,5 +1,5 @@
 {
-  "additionalProperties": false,
+    "additionalProperties": false,
     "properties": {
         "ListID": {
             "type": [
@@ -20,11 +20,11 @@
             ]
         },
         "CreateDate": {
-          "format": "date-time",
+            "format": "date-time",
             "type": [
                 "null",
                 "string"
-      ]
+            ]
         },
         "ShowEmailList": {
             "type": [
@@ -41,11 +41,11 @@
         "Vmta": {
             "type": [
                 "null",
-        "boolean"
-      ]
-    },
-    "Vmta": {
-      "additionalProperties": false,
+                "boolean"
+            ]
+        },
+        "Vmta": {
+            "additionalProperties": false,
             "properties": {
                 "Description": {
                     "type": [
@@ -60,10 +60,10 @@
                     ]
                 }
             },
-      "type": [
-        "null",
-        "object"
-      ]
+            "type": [
+                "null",
+                "object"
+            ]
         },
         "EnableDoubleOptin": {
             "type": [
@@ -120,5 +120,5 @@
             ]
         }
     },
-  "type": "object"
+    "type": "object"
 }

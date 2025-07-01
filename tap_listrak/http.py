@@ -9,7 +9,6 @@ LOGGER = singer.get_logger()
 WSDL = "https://webservices.listrak.com/v31/IntegrationService.asmx?wsdl"
 
 def get_client(config):
-    """Initialize the SOAP client with authentication headers."""
     client = zeep.Client(wsdl=WSDL)
     elem = client.get_element("{http://webservices.listrak.com/v31/}WSUser")
     headers = elem(UserName=config["username"], Password=config["password"])
