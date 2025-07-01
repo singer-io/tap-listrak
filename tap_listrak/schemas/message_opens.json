@@ -1,12 +1,7 @@
 {
   "type": "object",
   "properties": {
-    "MsgID": {
-      "type": [
-        "integer"
-      ]
-    },
-    "OpenDate": {
+    "ContactID": {
       "type": [
         "null",
         "string"
@@ -18,12 +13,12 @@
         "string"
       ]
     },
-    "ContactID": {
+    "OpenDate": {
       "type": [
         "null",
         "string"
-      ]
+      ],
+      "format": "date-time"
     }
-  },
-  "additionalProperties": false
+  }
 }

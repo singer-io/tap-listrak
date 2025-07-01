@@ -1,43 +1,32 @@
 {
     "type": "object",
     "properties": {
-        "ListID": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "ListName": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
         "BounceUnsubscribeCount": {
             "type": [
                 "null",
-                "integer"
+                "string"
             ]
         },
-        "EnableGoogleAnalytics": {
+        "CreateDate": {
             "type": [
                 "null",
-                "boolean"
-            ]
+                "string"
+            ],
+            "format": "date-time"
         },
-        "GoogleTrackingDomains": {
+        "DomainAliasEmail": {
             "type": [
                 "null",
                 "string"
             ]
         },
-        "EnableInternationalization": {
+        "DomainAliasLink": {
             "type": [
                 "null",
-                "boolean"
+                "string"
             ]
         },
-        "EnableRSS": {
+        "EnableBrowserLink": {
             "type": [
                 "null",
                 "boolean"
@@ -55,41 +44,16 @@
                 "boolean"
             ]
         },
-        "CreateDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
-        "ShowEmailList": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "EnableListRemoveHeader": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "EnableDynamicContent": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "EnableBrowserLink": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
         "EnableRemovalLink": {
             "type": [
                 "null",
                 "boolean"
+            ]
+        },
+        "FromEmail": {
+            "type": [
+                "null",
+                "string"
             ]
         },
         "FromName": {
@@ -98,7 +62,13 @@
                 "string"
             ]
         },
-        "FromEmail": {
+        "ListID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "ListName": {
             "type": [
                 "null",
                 "string"
@@ -110,25 +80,19 @@
                 "boolean"
             ]
         },
+        "ShowEmailList": {
+            "type": [
+                "null",
+                "boolean"
+            ]
+        },
         "Vmta": {
             "type": [
                 "null",
-                "string"
+                "integer"
             ]
         },
         "bounceHandling": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "DomainAliasLink": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "DomainAliasEmail": {
             "type": [
                 "null",
                 "string"

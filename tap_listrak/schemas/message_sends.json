@@ -1,18 +1,43 @@
 {
     "type": "object",
     "properties": {
-        "MsgID": {
-            "type": [
-                "integer"
-            ]
-        },
-        "EmailAddress": {
+        "BounceCount": {
             "type": [
                 "null",
                 "string"
             ]
         },
-        "ContactID": {
+        "BouncePercent": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "DeliverCount": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "DeliverPercent": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "ListID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "MsgID": {
+            "type": [
+                "null",
+                "string"
+            ]
+        },
+        "PassAlongCount": {
             "type": [
                 "null",
                 "string"
@@ -22,8 +47,14 @@
             "type": [
                 "null",
                 "string"
+            ],
+            "format": "date-time"
+        },
+        "Subject": {
+            "type": [
+                "null",
+                "string"
             ]
         }
-    },
-    "additionalProperties": false
+    }
 }
