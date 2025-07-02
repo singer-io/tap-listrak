@@ -85,7 +85,7 @@ def test_none_as_service_fn(mock_http_timer):
     """Test that passing None as the service function raises a TypeError."""
     with pytest.raises(TypeError):
         request("test_stream", None)
-    # Assertion: mock http_timer should be called only once
+    
     assert mock_http_timer.call_count == 1
 
 
