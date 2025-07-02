@@ -10,10 +10,10 @@ setup(
     classifiers=["Programming Language :: Python :: 3 :: Only"],
     py_modules=["tap_listrak"],
     install_requires=[
-        "singer-python==5.8.1",
-        "requests==2.20.0",
+        "singer-python==5.13.2",
+        "requests==2.32.4",
         "zeep",
-        'backoff==1.8.0',
+        'backoff==1.10.0',
         'pendulum==1.2.0',
     ],
     entry_points="""
