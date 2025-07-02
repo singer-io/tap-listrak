@@ -1,124 +1,118 @@
 {
-    "additionalProperties": false,
-    "properties": {
-        "ListID": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "ListName": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "bounceHandling": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "CreateDate": {
-            "format": "date-time",
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ShowEmailList": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "BounceUnsubscribeCount": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "Vmta": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "Vmta": {
-            "additionalProperties": false,
-            "properties": {
-                "Description": {
-                    "type": [
-                        "null",
-                        "string"
-                    ]
-                },
-                "VmtaID": {
-                    "type": [
-                        "null",
-                        "integer"
-                    ]
-                }
-            },
-            "type": [
-                "null",
-                "object"
-            ]
-        },
-        "EnableDoubleOptin": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "EnableListHygiene": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "DomainAliasLink": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "EnableBrowserLink": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "EnableRemovalLink": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "FromName": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "FromEmail": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ShowAdvancedPersonalization": {
-            "type": [
-                "null",
-                "boolean"
-            ]
-        },
-        "DomainAliasEmail": {
-            "type": [
-                "null",
-                "string"
-            ]
-        }
+  "additionalProperties": false,
+  "properties": {
+    "ListID": {
+      "type": [
+        "null",
+        "integer"
+      ]
     },
-    "type": "object"
+    "ListName": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "bounceHandling": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "CreateDate": {
+      "format": "date-time",
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "ShowEmailList": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "BounceUnsubscribeCount": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    },
+    "Vmta": {
+      "additionalProperties": false,
+      "properties": {
+        "Description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "VmtaID": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        }
+      },
+      "type": [
+        "null",
+        "object"
+      ]
+    },
+    "EnableDoubleOptin": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "EnableListHygiene": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "DomainAliasLink": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "EnableBrowserLink": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "EnableRemovalLink": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "FromName": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "FromEmail": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "ShowAdvancedPersonalization": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "DomainAliasEmail": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  },
+  "type": "object"
 }

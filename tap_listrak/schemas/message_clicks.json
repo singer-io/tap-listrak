@@ -1,36 +1,41 @@
 {
-    "type": "object",
-    "properties": {
-        "ContactID": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "EmailAddress": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "LinkUrl": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ClickDate": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "LinkDescription": {
-            "type": [
-                "null",
-                "string"
-            ]
-        }
+  "type": "object",
+  "properties": {
+    "MsgID": {
+      "type": [
+        "integer"
+      ]
     },
-    "additionalProperties": false
+    "ContactID": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "EmailAddress": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "LinkUrl": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "ClickDate": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "LinkDescription": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  },
+  "additionalProperties": false
 }

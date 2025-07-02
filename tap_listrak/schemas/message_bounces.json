@@ -1,42 +1,47 @@
 {
-    "type": "object",
-    "properties": {
-        "ContactID": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "EmailAddress": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BounceReason": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BounceDetail": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BounceDate": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "BounceCount": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        }
+  "type": "object",
+  "properties": {
+    "MsgID": {
+      "type": [
+        "integer"
+      ]
     },
-    "additionalProperties": false
+    "ContactID": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "EmailAddress": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "BounceReason": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "BounceDetail": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "BounceDate": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "BounceCount": {
+      "type": [
+        "null",
+        "integer"
+      ]
+    }
+  },
+  "additionalProperties": false
 }

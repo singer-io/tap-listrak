@@ -1,38 +1,41 @@
 {
-    "type": "object",
-    "properties": {
-        "ContactID": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "EmailAddress": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "AdditionDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
-        "RemovalDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
-        "RemovalMethod": {
-            "type": [
-                "null",
-                "string"
-            ]
-        }
+  "type": "object",
+  "properties": {
+    "MsgID": {
+      "type": [
+        "integer"
+      ]
     },
-    "additionalProperties": false
+    "ContactID": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "EmailAddress": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "AdditionDate": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "RemovalDate": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "RemovalMethod": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  },
+  "additionalProperties": false
 }

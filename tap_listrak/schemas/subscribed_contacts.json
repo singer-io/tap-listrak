@@ -1,35 +1,35 @@
 {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {
-        "AdditionDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
-        "EmailAddress": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "AdditionMethod": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "ContactID": {
-            "type": [
-                "string"
-            ]
-        },
-        "ListID": {
-            "type": [
-                "integer"
-            ]
-        }
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "AdditionDate": {
+      "type": [
+        "null",
+        "string"
+      ],
+      "format": "date-time"
+    },
+    "EmailAddress": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "AdditionMethod": {
+      "type": [
+        "null",
+        "string"
+      ]
+    },
+    "ContactID": {
+      "type": [
+        "string"
+      ]
+    },
+    "ListID": {
+      "type": [
+        "integer"
+      ]
     }
+  }
 }

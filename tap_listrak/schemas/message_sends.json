@@ -1,61 +1,17 @@
 {
-    "type": "object",
-    "properties": {
-        "ListID": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "MsgID": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "Subject": {
-            "type": [
-                "null",
-                "string"
-            ]
-        },
-        "SendDate": {
-            "type": [
-                "null",
-                "string"
-            ],
-            "format": "date-time"
-        },
-        "DeliverCount": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "DeliverPercent": {
-            "type": [
-                "null",
-                "number"
-            ]
-        },
-        "BounceCount": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        },
-        "BouncePercent": {
-            "type": [
-                "null",
-                "number"
-            ]
-        },
-        "PassAlongCount": {
-            "type": [
-                "null",
-                "integer"
-            ]
-        }
+  "additionalProperties": false,
+  "properties": {
+    "MsgID": {
+      "type": [
+        "integer"
+      ]
     },
-    "additionalProperties": false
+    "EmailAddress": {
+      "type": [
+        "null",
+        "string"
+      ]
+    }
+  },
+  "type": "object"
 }
