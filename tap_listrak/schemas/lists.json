@@ -7,6 +7,30 @@
         "integer"
       ]
     },
+    "EnableGoogleAnalytics": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "GoogleTrackingDomains": {
+      "items": {
+        "type": [
+          "null",
+          "string"
+        ]
+      },
+      "type": [
+        "null",
+        "array"
+      ]
+    },
+    "EnableInternationalization": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
     "ListName": {
       "type": [
         "null",
@@ -36,6 +60,12 @@
       "type": [
         "null",
         "integer"
+      ]
+    },
+    "EnableRSS": {
+      "type": [
+        "null",
+        "boolean"
       ]
     },
     "Vmta": {
@@ -75,6 +105,18 @@
       "type": [
         "null",
         "string"
+      ]
+    },
+    "EnableListRemoveHeader": {
+      "type": [
+        "null",
+        "boolean"
+      ]
+    },
+    "EnableDynamicContent": {
+      "type": [
+        "null",
+        "boolean"
       ]
     },
     "EnableBrowserLink": {
