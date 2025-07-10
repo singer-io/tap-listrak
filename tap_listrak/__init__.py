@@ -49,9 +49,21 @@ def discover(ctx):
 
 
 def sync(ctx):
+    """ 
+    Sync function updated:
+    Dynamically finds and calls corresponding stream sync functions
+    instead of only calling hardcoded sync_lists(ctx)
+    """
     for tap_stream_id in ctx.selected_stream_ids:
         schemas.load_and_write_schema(tap_stream_id)
-    streams_.sync_lists(ctx)
+
+        if hasattr(streams_, f"sync_{tap_stream_id}"):
+            sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
+            LOGGER.info(f"Syncing stream: {tap_stream_id}")
+            sync_fn(ctx)
+        else:
+            LOGGER.warning(f"No sync function found for stream: {tap_stream_id}")
+
     ctx.write_state()
 
 

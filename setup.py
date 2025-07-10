@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name="tap-listrak",
@@ -10,19 +10,21 @@ setup(
     classifiers=["Programming Language :: Python :: 3 :: Only"],
     py_modules=["tap_listrak"],
     install_requires=[
-        "singer-python==5.8.1",
-        "requests==2.20.0",
-        "zeep",
-        'backoff==1.8.0',
-        'pendulum==1.2.0',
+        "singer-python==6.1.1",
+        "requests==2.32.4",
+        "zeep==4.3.1",
+        'backoff==2.2.1',
+        'pendulum==3.1.0',
+        "urllib3==1.26.18",
+        "six==1.16.0"
     ],
     entry_points="""
     [console_scripts]
     tap-listrak=tap_listrak:main
     """,
-    packages=["tap_listrak"],
+    packages=find_packages(),
     package_data = {
-        "schemas": ["tap_listrak/schemas/*.json"]
+        "tap_listrak/schemas": ["*.json"]
     },
     include_package_data=True,
 )
