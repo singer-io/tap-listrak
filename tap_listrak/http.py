@@ -35,7 +35,7 @@ def is_non_retriable_exception(exc):
     max_tries=5,
     jitter=None,
     on_backoff=log_retry_attempt,
-    giveup=is_non_retriable_exception # This will prevent retry on bad login
+    giveup=is_non_retriable_exception
 )
 def request(tap_stream_id, service_fn, **kwargs):
     """Make SOAP API request with retry, metrics, and centralized error logging."""
