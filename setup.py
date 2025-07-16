@@ -14,9 +14,7 @@ setup(
         "requests==2.32.4",
         "zeep==4.3.1",
         'backoff==2.2.1',
-        'pendulum==3.1.0',
-        "urllib3==1.26.18",
-        "six==1.16.0"
+        'pendulum==3.1.0'
     ],
     entry_points="""
     [console_scripts]
