@@ -57,6 +57,9 @@ def sync(ctx):
     for tap_stream_id in ctx.selected_stream_ids:
         schemas.load_and_write_schema(tap_stream_id)
 
+        if tap_stream_id == "messages":
+            LOGGER.info("Skipping direct sync of 'messages'; it will be handled via 'lists'")
+            continue
         if hasattr(streams_, f"sync_{tap_stream_id}"):
             sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
             LOGGER.info(f"Syncing stream: {tap_stream_id}")
