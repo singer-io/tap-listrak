@@ -72,9 +72,7 @@ def main_impl():
     ctx = Context(args.config, args.state)
     if args.discover:
         discover(ctx).dump()
-        print()
     elif args.catalog:
-
         ctx.catalog = Catalog.from_dict(args.properties) \
             if args.properties else discover(ctx)
         sync(ctx)
