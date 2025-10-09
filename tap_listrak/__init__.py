@@ -12,6 +12,18 @@ REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
 
+class CustomCatalogEntry(CatalogEntry):
+
+    def __init__(self, *args, forced_replication_method=None, **kwargs):
+        self.forced_replication_method = kwargs.pop('forced_replication_method', forced_replication_method)
+        super().__init__(*args, **kwargs)
+
+    def to_dict(self):
+        result = super().to_dict()
+        if self.forced_replication_method is not None:
+            result['forced_replication_method'] = self.forced_replication_method
+        return result
+
 def check_credentials_are_authorized(ctx):
     pass
 
@@ -38,9 +50,10 @@ def discover(ctx):
         for field_name in schema_dict['properties'].keys():
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
-        catalog.streams.append(CatalogEntry(
+        catalog.streams.append(CustomCatalogEntry(
             stream=tap_stream_id,
             tap_stream_id=tap_stream_id,
+            forced_replication_method=schemas.REPLICATION_METHODS[tap_stream_id],
             key_properties=schemas.PK_FIELDS[tap_stream_id],
             schema=schema,
             metadata = metadata.to_list(mdata)
