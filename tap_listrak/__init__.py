@@ -15,13 +15,13 @@ LOGGER = singer.get_logger()
 class CustomCatalogEntry(CatalogEntry):
 
     def __init__(self, *args, forced_replication_method=None, **kwargs):
-        self.forced_replication_method = kwargs.pop('forced_replication_method', forced_replication_method)
+        self.forced_replication_method = forced_replication_method
         super().__init__(*args, **kwargs)
 
     def to_dict(self):
         result = super().to_dict()
         if self.forced_replication_method is not None:
-            result['forced_replication_method'] = self.forced_replication_method
+            result['forced-replication-method'] = self.forced_replication_method
         return result
 
 def check_credentials_are_authorized(ctx):
