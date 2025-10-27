@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.2.0
-  * forced replication method to metadata [#25](https://github.com/singer-io/tap-listrak/pull/25)
+  * Added forced replication method to metadata [#25](https://github.com/singer-io/tap-listrak/pull/25)
 
 ## 1.1.0
   * Switches annotated_schema to metadata [#10](https://github.com/singer-io/tap-listrak/pull/10)
