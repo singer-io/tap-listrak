@@ -11,7 +11,6 @@ from . import schemas
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
-
 def check_credentials_are_authorized(ctx):
     pass
 
@@ -25,6 +24,7 @@ def discover(ctx):
         schema = Schema.from_dict(schema_dict)
 
         mdata = metadata.get_standard_metadata(schema_dict,
+                                               replication_method=schemas.REPLICATION_METHODS[tap_stream_id],
                                                key_properties=schemas.PK_FIELDS[tap_stream_id])
 
         mdata = metadata.to_map(mdata)
