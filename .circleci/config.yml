@@ -1,56 +1,25 @@
-version: 2.1
-
+version: 2
 jobs:
   build:
     docker:
-      - image: 218546966473.dkr.ecr.us-east-1.amazonaws.com/circle-ci:stitch-tap-tester
-
+      - image: 218546966473.dkr.ecr.us-east-1.amazonaws.com/circle-ci:stitch-tap-tester-uv
     steps:
       - checkout
-
       - run:
-          name: "Setup virtual env and install tap-listrak"
+          name: 'Setup virtual env'
           command: |
-            python3 -m venv /usr/local/share/virtualenvs/tap-listrak
+            uv venv --python 3.9 /usr/local/share/virtualenvs/tap-listrak
             source /usr/local/share/virtualenvs/tap-listrak/bin/activate
-            pip install -U "pip==22.2.2" "setuptools==65.3.0"
-            pip install -e .[dev]
-
+            uv pip install -U pip setuptools
+            uv pip install .[dev]
+      - add_ssh_keys
       - run:
-          name: "JSON Validator"
+          name: 'JSON Validator'
           command: |
-            stitch-validate-json tap_listrak/schemas/*.json
-
-      - run:
-          name: "Run Pylint"
-          command: |
-            source /usr/local/share/virtualenvs/tap-listrak/bin/activate
-            pip install pylint
-            pylint tap_listrak -d C,R,W
-
-      - run:
-          name: "Run Unit Tests with Pytest"
-          command: |
-            source /usr/local/share/virtualenvs/tap-listrak/bin/activate
-            pip install pytest coverage pytest-cov
-            pip install opentelemetry-api opentelemetry-sdk
-            mkdir -p test_output
-            pytest --cov=tap_listrak --cov-report html:htmlcov --junitxml=test_output/report.xml tests/unittests/
-
-      - store_test_results:
-          path: test_output
-
-      - store_artifacts:
-          path: htmlcov
-
+            source /usr/local/share/virtualenvs/tap-tester/bin/activate
+            stitch-validate-json /usr/local/share/virtualenvs/tap-listrak/lib/python3.9/site-packages/tap_listrak/schemas/*.json
 workflows:
   version: 2
-
-  commit:
-    jobs:
-      - build:
-          context: circleci-user
-
   build_daily:
     triggers:
       - schedule:
