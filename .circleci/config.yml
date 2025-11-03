@@ -20,6 +20,10 @@ jobs:
             stitch-validate-json /usr/local/share/virtualenvs/tap-listrak/lib/python3.9/site-packages/tap_listrak/schemas/*.json
 workflows:
   version: 2
+  commit:
+    jobs:
+      - build:
+          context: circleci-user
   build_daily:
     triggers:
       - schedule:
