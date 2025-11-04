@@ -1,7 +1,9 @@
 # Changelog
 
-## 1.1.1
+## 1.2.0
   * Bump dependency versions for twistlock compliance [#22](https://github.com/singer-io/tap-listrak/pull/22)
+  * Improves error handling for 5XX responses and unhandled Listrak exceptions [#21](https://github.com/singer-io/tap-listrak/pull/21)
+  * Updated Listrak schema definitions
 
 ## 1.1.0
   * Switches annotated_schema to metadata [#10](https://github.com/singer-io/tap-listrak/pull/10)
