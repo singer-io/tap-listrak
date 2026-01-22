@@ -82,7 +82,7 @@ class BOOK(object):
 
 def sync_subscribed_contacts(ctx, lists=None):
     start_dt = ctx.update_start_date_bookmark(BOOK.SUBSCRIBED_CONTACTS)
-    if not lists:
+    if lists is None:
         response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
         lists = transform(response)
     for lst in lists:
