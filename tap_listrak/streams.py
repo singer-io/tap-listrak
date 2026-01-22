@@ -80,8 +80,11 @@ class BOOK(object):
     MESSAGE_SENDS = [IDS.MESSAGE_SENDS, "SendDate"]
 
 
-def sync_subscribed_contacts(ctx, lists):
+def sync_subscribed_contacts(ctx, lists=None):
     start_dt = ctx.update_start_date_bookmark(BOOK.SUBSCRIBED_CONTACTS)
+    if not lists:
+        response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
+        lists = transform(response)
     for lst in lists:
         for page in gen_pages():
             response = request(IDS.SUBSCRIBED_CONTACTS,
