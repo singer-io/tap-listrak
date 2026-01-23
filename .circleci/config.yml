@@ -17,7 +17,7 @@ jobs:
           name: 'JSON Validator'
           command: |
             source /usr/local/share/virtualenvs/tap-tester/bin/activate
-            stitch-validate-json /usr/local/share/virtualenvs/tap-listrak/lib/python3.9/site-packages/tap_listrak/schemas/*.json
+            stitch-validate-json /usr/local/share/virtualenvs/tap-listrak/lib/python3.12/site-packages/tap_listrak/schemas/*.json
 workflows:
   version: 2
   commit:
