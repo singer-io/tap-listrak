@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1
+  * Fixes error when syncing subscribed_contacts from cli [#26](https://github.com/singer-io/tap-listrak/pull/26)
+
 ## 1.2.0
   * Bump dependency versions for twistlock compliance [#22](https://github.com/singer-io/tap-listrak/pull/22)
   * Improves error handling for 5XX responses and unhandled Listrak exceptions [#21](https://github.com/singer-io/tap-listrak/pull/21)
