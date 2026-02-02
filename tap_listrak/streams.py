@@ -167,9 +167,12 @@ def new_max_send_dt(messages, old_max):
     return max(max_this_batch, old_max) if old_max else max_this_batch
 
 
-def sync_messages(ctx, lists):
+def sync_messages(ctx, lists=None):
     start_dt = ctx.config["start_date"]
     max_send_dt = None
+    if lists is None:
+        response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
+        lists = transform(response)
     for lst in lists:
         for begin_dt, end_dt in gen_intervals(ctx, start_dt):
             response = request(IDS.MESSAGES,
