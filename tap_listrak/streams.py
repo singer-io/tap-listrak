@@ -80,11 +80,8 @@ class BOOK(object):
     MESSAGE_SENDS = [IDS.MESSAGE_SENDS, "SendDate"]
 
 
-def sync_subscribed_contacts(ctx, lists=None):
+def _sync_subscribed_contacts(ctx, lists):
     start_dt = ctx.update_start_date_bookmark(BOOK.SUBSCRIBED_CONTACTS)
-    if lists is None:
-        response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
-        lists = transform(response)
     for lst in lists:
         for page in gen_pages():
             response = request(IDS.SUBSCRIBED_CONTACTS,
@@ -110,7 +107,7 @@ MESSAGE_SUB_STREAMS = [
 ]
 
 
-def sync_message_sub_stream(ctx, messages, sub_stream):
+def _sync_message_sub_stream(ctx, messages, sub_stream):
     start_dt = ctx.update_start_date_bookmark(sub_stream.bookmark)
     for msg in messages:
         for page in gen_pages():
@@ -126,13 +123,13 @@ def sync_message_sub_stream(ctx, messages, sub_stream):
             write_records(sub_stream.tap_stream_id, records)
 
 
-def sync_sub_streams(ctx, messages):
+def _sync_sub_streams(ctx, messages):
     for sub_stream in MESSAGE_SUB_STREAMS:
         if sub_stream.tap_stream_id in ctx.selected_stream_ids:
-            sync_message_sub_stream(ctx, messages, sub_stream)
+            _sync_message_sub_stream(ctx, messages, sub_stream)
 
 
-def sync_message_sends_if_selected(ctx, messages):
+def _sync_message_sends_if_selected(ctx, messages):
     if not IDS.MESSAGE_SENDS in ctx.selected_stream_ids:
         return
     start_dt = ctx.update_start_date_bookmark(BOOK.MESSAGE_SENDS)
@@ -167,7 +164,7 @@ def new_max_send_dt(messages, old_max):
     return max(max_this_batch, old_max) if old_max else max_this_batch
 
 
-def sync_messages(ctx, lists=None):
+def _sync_messages(ctx, lists):
     start_dt = ctx.config["start_date"]
     max_send_dt = None
     if lists is None:
@@ -187,8 +184,8 @@ def sync_messages(ctx, lists=None):
             messages = transform(act_result["WSMessageActivity"])
             write_records(IDS.MESSAGES, messages)
             max_send_dt = new_max_send_dt(messages, max_send_dt)
-            sync_sub_streams(ctx, messages)
-            sync_message_sends_if_selected(ctx, messages)
+            _sync_sub_streams(ctx, messages)
+            _sync_message_sends_if_selected(ctx, messages)
     update_sub_stream_bookmarks(ctx)
     update_message_sends_bookmark(ctx, max_send_dt)
     ctx.write_state()
@@ -199,6 +196,6 @@ def sync_lists(ctx):
     lists = transform(response)
     write_records(IDS.LISTS, lists)
     if IDS.MESSAGES in ctx.selected_stream_ids:
-        sync_messages(ctx, lists)
+        _sync_messages(ctx, lists)
     if IDS.SUBSCRIBED_CONTACTS in ctx.selected_stream_ids:
-        sync_subscribed_contacts(ctx, lists)
+        _sync_subscribed_contacts(ctx, lists)

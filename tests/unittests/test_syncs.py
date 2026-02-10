@@ -19,41 +19,6 @@ class TestSyncFunctions(unittest.TestCase):
 
     @patch('tap_listrak.streams.request')
     @patch('tap_listrak.streams.write_records')
-    def test_sync_subscribed_contacts_without_lists(self, mock_write_records, mock_request):
-        mock_request.side_effect = [
-            [{'ListID': '1'}, {'ListID': '2'}],  # Mock response for lists
-            [{'ContactID': '123', 'Email': 'test@example.com'}],  # Mock response for list 1, page 1
-            [],  # Mock response for list 1, page 2 (end of data)
-            [{'ContactID': '456', 'Email': 'test2@example.com'}],  # Mock response for list 2, page 1
-            []  # Mock response for list 2, page 2 (end of data)
-        ]
-
-        streams.sync_subscribed_contacts(self.ctx)
-
-        # Assert that the request was called for lists and subscribed contacts
-        self.assertEqual(mock_request.call_count, 5)
-
-        # Assert that write_records was called with the correct data for both lists
-        self.assertEqual(mock_write_records.call_count, 2)
-        
-        # Verify first list contacts
-        mock_write_records.assert_any_call(
-            streams.IDS.SUBSCRIBED_CONTACTS,
-            [{'ContactID': '123', 'Email': 'test@example.com', 'ListID': '1'}]
-        )
-        
-        # Verify second list contacts
-        mock_write_records.assert_any_call(
-            streams.IDS.SUBSCRIBED_CONTACTS,
-            [{'ContactID': '456', 'Email': 'test2@example.com', 'ListID': '2'}]
-        )
-
-        # Assert that bookmarks and state were updated
-        self.ctx.set_bookmark.assert_called_with(streams.BOOK.SUBSCRIBED_CONTACTS, self.ctx.now)
-        self.ctx.write_state.assert_called_once()
-
-    @patch('tap_listrak.streams.request')
-    @patch('tap_listrak.streams.write_records')
     def test_sync_subscribed_contacts_with_lists(self, mock_write_records, mock_request):
         mock_request.side_effect = [
             [{'ListID': '1'}, {'ListID': '2'}],  # Mock response for lists
@@ -63,7 +28,7 @@ class TestSyncFunctions(unittest.TestCase):
             []  # Mock response for list 2, page 2 (end of data)
         ]
 
-        streams.sync_subscribed_contacts(self.ctx, [{'ListID': '1'}, {'ListID': '2'}])
+        streams._sync_subscribed_contacts(self.ctx, [{'ListID': '1'}, {'ListID': '2'}])
 
         # Assert that the request was called for lists and subscribed contacts
         self.assertEqual(mock_request.call_count, 5)
@@ -123,7 +88,7 @@ class TestSyncFunctions(unittest.TestCase):
             },  # Mock response for messages
         ]
 
-        streams.sync_messages(self.ctx, [{'ListID': '1', 'Name': 'Test List'}])
+        streams._sync_messages(self.ctx, [{'ListID': '1', 'Name': 'Test List'}])
 
         # Assert that the request was called for messages
         self.assertEqual(mock_request.call_count, 1)
@@ -133,15 +98,9 @@ class TestSyncFunctions(unittest.TestCase):
             streams.IDS.MESSAGES,
             [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
         )
-
-
-    @patch('tap_listrak.streams.request')
-    @patch('tap_listrak.streams.write_records')
-    def test_sync_messages_without_list(self, mock_write_records, mock_request):
         self.ctx.selected_stream_ids = ['messages']
 
         mock_request.side_effect = [
-            [{'ListID': '1', 'Name': 'Test List'}],  # Mock response for fetching lists
             {
                 'ReportListMessageActivityResult': {
                     'WSMessageActivity': [
@@ -151,7 +110,7 @@ class TestSyncFunctions(unittest.TestCase):
             },  # Mock response for messages
         ]
 
-        streams.sync_messages(self.ctx)
+        streams._sync_messages(self.ctx, [{'ListID': '1', 'Name': 'Test List'}])
 
         # Assert that the request was called twice: once for lists, once for messages
         self.assertEqual(mock_request.call_count, 2)
@@ -181,7 +140,7 @@ class TestSyncFunctions(unittest.TestCase):
             []  # Msg 2, Page 2 (end)
         ]
         
-        streams.sync_message_sub_stream(self.ctx, messages, sub_stream)
+        streams._sync_message_sub_stream(self.ctx, messages, sub_stream)
         
         # Assert that requests were made for both messages
         self.assertEqual(mock_request.call_count, 4)
@@ -199,15 +158,15 @@ class TestSyncFunctions(unittest.TestCase):
             [{'ClickID': '2', 'ClickDate': '2026-01-21T00:00:00Z', 'MsgID': '2'}]
         )
 
-    @patch('tap_listrak.streams.sync_message_sub_stream')
+    @patch('tap_listrak.streams._sync_message_sub_stream')
     def test_sync_sub_streams(self, mock_sync_message_sub_stream):
         self.ctx.selected_stream_ids = ['message_clicks', 'message_opens']
         
         messages = [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
         
-        streams.sync_sub_streams(self.ctx, messages)
+        streams._sync_sub_streams(self.ctx, messages)
         
-        # Assert that sync_message_sub_stream was called for each selected sub stream
+        # Assert that _sync_message_sub_stream was called for each selected sub stream
         self.assertEqual(mock_sync_message_sub_stream.call_count, 2)
 
     @patch('tap_listrak.streams.request')
@@ -228,7 +187,7 @@ class TestSyncFunctions(unittest.TestCase):
             {'ReportMessageContactSentResult': None}  # Page 2 (end)
         ]
         
-        streams.sync_message_sends_if_selected(self.ctx, messages)
+        streams._sync_message_sends_if_selected(self.ctx, messages)
         
         # Assert that requests were made
         self.assertEqual(mock_request.call_count, 2)
@@ -246,14 +205,14 @@ class TestSyncFunctions(unittest.TestCase):
         
         messages = [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
         
-        streams.sync_message_sends_if_selected(self.ctx, messages)
+        streams._sync_message_sends_if_selected(self.ctx, messages)
         
         # Assert that no requests were made
         mock_request.assert_not_called()
         mock_write_records.assert_not_called()
 
-    @patch('tap_listrak.streams.sync_subscribed_contacts')
-    @patch('tap_listrak.streams.sync_messages')
+    @patch('tap_listrak.streams._sync_subscribed_contacts')
+    @patch('tap_listrak.streams._sync_messages')
     @patch('tap_listrak.streams.request')
     @patch('tap_listrak.streams.write_records')
     def test_sync_lists_with_nested_streams(self, mock_write_records, mock_request, 

@@ -50,19 +50,40 @@ def discover(ctx):
 
 def sync(ctx):
     """ 
-    Sync function updated:
-    Dynamically finds and calls corresponding stream sync functions
-    instead of only calling hardcoded sync_lists(ctx)
+    Sync function updated to respect stream dependencies.
+    
+    Instead of calling sync functions dynamically, this function ensures:
+    1. Parent streams are validated to be selected if child streams are selected
+    2. All syncing goes through the appropriate parent sync functions (sync_lists for lists-dependent streams)
+    
+    This maintains the original design where:
+    - sync_lists handles: lists, messages (and its substreams), subscribed_contacts
+    - Individual sync functions only exist for independent streams
     """
-    for tap_stream_id in ctx.selected_stream_ids:
-        schemas.load_and_write_schema(tap_stream_id)
-
-        if hasattr(streams_, f"sync_{tap_stream_id}"):
-            sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
-            LOGGER.info(f"Syncing stream: {tap_stream_id}")
-            sync_fn(ctx)
-        else:
-            LOGGER.warning(f"No sync function found for stream: {tap_stream_id}")
+    
+    # Check if any stream requires lists to be synced
+    lists_dependent_streams = {'lists', 'messages', 'subscribed_contacts', 
+                               'message_clicks', 'message_opens', 'message_reads',
+                               'message_sends', 'message_unsubs', 'message_bounces'}
+    
+    needs_lists_sync = any(stream in ctx.selected_stream_ids for stream in lists_dependent_streams)
+    
+    if needs_lists_sync:
+        # All lists-dependent streams are synced through sync_lists
+        LOGGER.info("Syncing lists and its dependent streams")
+        schemas.load_and_write_schema('lists')
+        streams_.sync_lists(ctx)
+    else:
+        # For any other independent streams (if added in future)
+        for tap_stream_id in ctx.selected_stream_ids:
+            if tap_stream_id not in lists_dependent_streams:
+                schemas.load_and_write_schema(tap_stream_id)
+                if hasattr(streams_, f"sync_{tap_stream_id}"):
+                    sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
+                    LOGGER.info(f"Syncing stream: {tap_stream_id}")
+                    sync_fn(ctx)
+                else:
+                    LOGGER.warning(f"No sync function found for stream: {tap_stream_id}")
 
     ctx.write_state()
 
