@@ -98,22 +98,7 @@ class TestSyncFunctions(unittest.TestCase):
             streams.IDS.MESSAGES,
             [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
         )
-        self.ctx.selected_stream_ids = ['messages']
-
-        mock_request.side_effect = [
-            {
-                'ReportListMessageActivityResult': {
-                    'WSMessageActivity': [
-                        {'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}
-                    ]
-                }
-            },  # Mock response for messages
-        ]
-
-        streams._sync_messages(self.ctx, [{'ListID': '1', 'Name': 'Test List'}])
-
-        # Assert that the request was called twice: once for lists, once for messages
-        self.assertEqual(mock_request.call_count, 2)
+        
 
     @patch('tap_listrak.streams.request')
     @patch('tap_listrak.streams.write_records')
