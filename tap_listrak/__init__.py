@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import os
-import json
 import singer
 from singer import utils, metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
@@ -10,6 +8,17 @@ from . import schemas
 
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
+
+STREAM_DEPENDENCIES = {
+    'messages': 'lists', 
+    'message_bounces': 'messages', 
+    'message_clicks': 'messages', 
+    'message_opens': 'messages', 
+    'message_reads': 'messages', 
+    'message_sends': 'messages', 
+    'message_unsubs': 'messages', 
+    'subscribed_contacts': 'lists'
+}
 
 
 def check_credentials_are_authorized(ctx):
@@ -71,19 +80,30 @@ def sync(ctx):
     if needs_lists_sync:
         # All lists-dependent streams are synced through sync_lists
         LOGGER.info("Syncing lists and its dependent streams")
-        schemas.load_and_write_schema('lists')
+        
+        # Collect all parent streams that need to be loaded
+        parent_streams_to_load = set()
+        
+        for stream_id in ctx.selected_stream_ids:
+            if stream_id in lists_dependent_streams:
+                # Add the stream itself
+                parent_streams_to_load.add(stream_id)
+                
+                # Add all parent streams in the dependency chain
+                current_stream = stream_id
+                while current_stream in STREAM_DEPENDENCIES:
+                    parent_stream = STREAM_DEPENDENCIES[current_stream]
+                    parent_streams_to_load.add(parent_stream)
+                    current_stream = parent_stream
+        
+        # Load schemas for all collected parent streams
+        for stream_id in parent_streams_to_load:
+            schemas.load_and_write_schema(stream_id)
+            
         streams_.sync_lists(ctx)
-    else:
-        # For any other independent streams (if added in future)
-        for tap_stream_id in ctx.selected_stream_ids:
-            if tap_stream_id not in lists_dependent_streams:
-                schemas.load_and_write_schema(tap_stream_id)
-                if hasattr(streams_, f"sync_{tap_stream_id}"):
-                    sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
-                    LOGGER.info(f"Syncing stream: {tap_stream_id}")
-                    sync_fn(ctx)
-                else:
-                    LOGGER.warning(f"No sync function found for stream: {tap_stream_id}")
+
+    # In future we need to add streams independent of lists, 
+    # we can add their sync calls in `else` block.
 
     ctx.write_state()
 
