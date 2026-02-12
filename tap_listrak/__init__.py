@@ -9,17 +9,6 @@ from . import schemas
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
-STREAM_DEPENDENCIES = {
-    'messages': 'lists',
-    'message_bounces': 'messages',
-    'message_clicks': 'messages',
-    'message_opens': 'messages',
-    'message_reads': 'messages',
-    'message_sends': 'messages',
-    'message_unsubs': 'messages',
-    'subscribed_contacts': 'lists'
-}
-
 
 def check_credentials_are_authorized(ctx):
     pass
