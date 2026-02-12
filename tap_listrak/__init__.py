@@ -49,7 +49,7 @@ def discover(ctx):
 
 
 def sync(ctx):
-    """ 
+    """
     Sync function updated:
     Dynamically finds and calls corresponding stream sync functions
     instead of only calling hardcoded sync_lists(ctx)

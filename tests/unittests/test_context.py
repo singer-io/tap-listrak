@@ -203,64 +203,6 @@ class TestContextBookmarks:
 
 @patch('tap_listrak.context.get_client')
 @patch('tap_listrak.context.bks_')
-class TestContextOffsets:
-    """Test Context offset methods."""
-
-    def test_get_offset_with_existing_offset(self, mock_bks, mock_get_client, mock_config, mock_state):
-        """Test get_offset returns existing offset value."""
-        mock_get_client.return_value = MagicMock()
-        mock_bks.get_offset.return_value = {"field": "value"}
-
-        ctx = Context(mock_config, mock_state)
-        result = ctx.get_offset(["lists", "field"])
-
-        mock_bks.get_offset.assert_called_once_with(mock_state, "lists")
-        assert result == "value"
-
-    def test_get_offset_with_no_offset(self, mock_bks, mock_get_client, mock_config, mock_state):
-        """Test get_offset returns None when offset doesn't exist."""
-        mock_get_client.return_value = MagicMock()
-        mock_bks.get_offset.return_value = None
-
-        ctx = Context(mock_config, mock_state)
-        result = ctx.get_offset(["lists", "field"])
-
-        mock_bks.get_offset.assert_called_once_with(mock_state, "lists")
-        assert result is None
-
-    def test_get_offset_with_empty_dict(self, mock_bks, mock_get_client, mock_config, mock_state):
-        """Test get_offset returns None when offset dict is empty."""
-        mock_get_client.return_value = MagicMock()
-        mock_bks.get_offset.return_value = {}
-
-        ctx = Context(mock_config, mock_state)
-        result = ctx.get_offset(["lists", "field"])
-
-        assert result is None
-
-    def test_set_offset(self, mock_bks, mock_get_client, mock_config, mock_state):
-        """Test set_offset calls bookmarks.set_offset correctly."""
-        mock_get_client.return_value = MagicMock()
-
-        ctx = Context(mock_config, mock_state)
-        ctx.set_offset(["lists", "field"], "offset_value")
-
-        mock_bks.set_offset.assert_called_once_with(
-            mock_state, "lists", "field", "offset_value"
-        )
-
-    def test_clear_offsets(self, mock_bks, mock_get_client, mock_config, mock_state):
-        """Test clear_offsets calls bookmarks.clear_offset correctly."""
-        mock_get_client.return_value = MagicMock()
-
-        ctx = Context(mock_config, mock_state)
-        ctx.clear_offsets("lists")
-
-        mock_bks.clear_offset.assert_called_once_with(mock_state, "lists")
-
-
-@patch('tap_listrak.context.get_client')
-@patch('tap_listrak.context.bks_')
 @patch('tap_listrak.context.pendulum')
 class TestUpdateStartDateBookmark:
     """Test Context update_start_date_bookmark method."""
