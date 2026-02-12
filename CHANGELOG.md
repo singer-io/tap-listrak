@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.0.0
+  * Changes the bookmark records to remove `offset` and moved `activate_versions` [#26](https://github.com/singer-io/tap-listrak/pull/26)
+
 ## 1.2.1
   * Fixes error when syncing subscribed_contacts from cli [#26](https://github.com/singer-io/tap-listrak/pull/26)
 
