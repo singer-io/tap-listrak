@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="tap-listrak",
-    version="2.0.0",
+    version="1.3.0",
     description="Singer.io tap for extracting data from the Listrak API",
     author="Stitch",
     url="http://singer.io",
