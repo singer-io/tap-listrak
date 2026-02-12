@@ -64,32 +64,12 @@ def sync(ctx):
     This approach is necessary because:
     1. Child streams depend on parent stream data and cannot be synced independently
     2. Parent streams must be synced first to provide the necessary context and IDs for their child streams
-    3. Loading parent stream schemas upfront prevents state management issues and ensures schema consistency across dependent streams
     """
 
     # All lists-dependent streams are synced through sync_lists
     LOGGER.info("Syncing lists and its dependent streams")
 
-    # Collect all parent streams that need to be loaded
-    parent_streams_to_load = set()
-
-    for stream_id in ctx.selected_stream_ids:
-        # Add the stream itself
-        parent_streams_to_load.add(stream_id)
-
-        # Add all parent streams in the dependency chain
-        current_stream = stream_id
-        while current_stream in STREAM_DEPENDENCIES:
-            parent_stream = STREAM_DEPENDENCIES[current_stream]
-            parent_streams_to_load.add(parent_stream)
-            current_stream = parent_stream
-
-    # Load schemas for all collected parent streams
-    for stream_id in parent_streams_to_load:
-        schemas.load_and_write_schema(stream_id)
-
     streams_.sync_lists(ctx)
-
     ctx.write_state()
 
 
