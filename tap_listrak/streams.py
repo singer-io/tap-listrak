@@ -190,7 +190,7 @@ def sync_messages(ctx, lists):
 
 def sync_lists(ctx):
     response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
-    lists = transform(response)
+    lists = transform(response) or []
     write_records(IDS.LISTS, lists)
     if IDS.MESSAGES in ctx.selected_stream_ids:
         sync_messages(ctx, lists)
