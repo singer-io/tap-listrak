@@ -1,9 +1,8 @@
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 from tap_listrak import streams
 from tap_listrak.context import Context
-from tap_listrak import sync
 
 class TestSyncFunctions(unittest.TestCase):
 
