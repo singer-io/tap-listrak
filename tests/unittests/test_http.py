@@ -32,7 +32,7 @@ def test_successful_request(mock_http_timer):
     assert mock_http_timer.call_count == 1
 
 
-def test_xml_syntax_error_retry(mock_http_timer):
+def test_xml_syntax_error_retry(mock_http_timer, mock_sleep):
     """Test that XMLSyntaxError triggers retries up to MAX_RETRIES."""
     failing_mock = MagicMock(side_effect=XMLSyntaxError("Simulated XML error"))
 
@@ -41,9 +41,10 @@ def test_xml_syntax_error_retry(mock_http_timer):
 
     assert failing_mock.call_count == MAX_RETRIES
     assert mock_http_timer.call_count == MAX_RETRIES
+    assert mock_sleep.call_count == MAX_RETRIES - 1  # Sleep called between retries
 
 
-def test_fault_error_retry(mock_http_timer):
+def test_fault_error_retry(mock_http_timer, mock_sleep):
     """Test that Fault exception triggers retries up to MAX_RETRIES."""
     failing_mock = MagicMock(side_effect=Fault("Simulated Fault"))
 
@@ -52,9 +53,10 @@ def test_fault_error_retry(mock_http_timer):
 
     assert failing_mock.call_count == MAX_RETRIES
     assert mock_http_timer.call_count == MAX_RETRIES
+    assert mock_sleep.call_count == MAX_RETRIES - 1  # Sleep called between retries
 
 
-def test_transport_error_retry(mock_http_timer):
+def test_transport_error_retry(mock_http_timer, mock_sleep):
     """Test that TransportError triggers retries up to MAX_RETRIES."""
     failing_mock = MagicMock(side_effect=TransportError(502, "Bad Gateway"))
 
@@ -63,9 +65,10 @@ def test_transport_error_retry(mock_http_timer):
 
     assert failing_mock.call_count == MAX_RETRIES
     assert mock_http_timer.call_count == MAX_RETRIES
+    assert mock_sleep.call_count == MAX_RETRIES - 1  # Sleep called between retries
 
 
-def test_retry_recovers_before_max_attempts(mock_http_timer):
+def test_retry_recovers_before_max_attempts(mock_http_timer, mock_sleep):
     """Test that a request recovers after a few retries before reaching max."""
     service_mock = MagicMock()
     service_mock.side_effect = [XMLSyntaxError("fail"), "Recovered"]
@@ -75,6 +78,7 @@ def test_retry_recovers_before_max_attempts(mock_http_timer):
     assert result == "Recovered"
     assert service_mock.call_count == 2
     assert mock_http_timer.call_count == 2
+    assert mock_sleep.call_count == 1  # Sleep called once between the two attempts
 
 
 def test_unhandled_exception_not_retried(mock_http_timer):
