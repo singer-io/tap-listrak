@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import os
-import json
 import singer
 from singer import utils, metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
@@ -12,13 +10,13 @@ REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
 STREAM_DEPENDENCIES = {
-    'messages': 'lists', 
-    'message_bounces': 'messages', 
-    'message_clicks': 'messages', 
-    'message_opens': 'messages', 
-    'message_reads': 'messages', 
-    'message_sends': 'messages', 
-    'message_unsubs': 'messages', 
+    'messages': 'lists',
+    'message_bounces': 'messages',
+    'message_clicks': 'messages',
+    'message_opens': 'messages',
+    'message_reads': 'messages',
+    'message_sends': 'messages',
+    'message_unsubs': 'messages',
     'subscribed_contacts': 'lists'
 }
 
@@ -63,20 +61,37 @@ def discover(ctx):
 
 
 def sync(ctx):
-    """ 
-    Sync function updated:
-    Dynamically finds and calls corresponding stream sync functions
-    instead of only calling hardcoded sync_lists(ctx)
     """
-    for tap_stream_id in ctx.selected_stream_ids:
-        schemas.load_and_write_schema(tap_stream_id)
+    Sync function updated to respect stream dependencies.
 
-        if hasattr(streams_, f"sync_{tap_stream_id}"):
-            sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
-            LOGGER.info(f"Syncing stream: {tap_stream_id}")
-            sync_fn(ctx)
-        else:
-            LOGGER.warning(f"No sync function found for stream: {tap_stream_id}")
+    This approach is necessary because:
+    1. Child streams depend on parent stream data and cannot be synced independently
+    2. Parent streams must be synced first to provide the necessary context and IDs for their child streams
+    3. Loading parent stream schemas upfront prevents state management issues and ensures schema consistency across dependent streams
+    """
+
+    # All lists-dependent streams are synced through sync_lists
+    LOGGER.info("Syncing lists and its dependent streams")
+
+    # Collect all parent streams that need to be loaded
+    parent_streams_to_load = set()
+
+    for stream_id in ctx.selected_stream_ids:
+        # Add the stream itself
+        parent_streams_to_load.add(stream_id)
+
+        # Add all parent streams in the dependency chain
+        current_stream = stream_id
+        while current_stream in STREAM_DEPENDENCIES:
+            parent_stream = STREAM_DEPENDENCIES[current_stream]
+            parent_streams_to_load.add(parent_stream)
+            current_stream = parent_stream
+
+    # Load schemas for all collected parent streams
+    for stream_id in parent_streams_to_load:
+        schemas.load_and_write_schema(stream_id)
+
+    streams_.sync_lists(ctx)
 
     ctx.write_state()
 
