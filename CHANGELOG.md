@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.0
+## 1.5.0
   * Updated singer-python version [#30](https://github.com/singer-io/tap-listrak/pull/30)
 
 ## 1.2.1
