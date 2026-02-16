@@ -6,6 +6,7 @@
   * Adds schema loading to all sync functions to ensure schemas are written before records.
   * Adds comprehensive unit tests for sync functions, schemas, context, and HTTP retry logic.
   * Updates CircleCI configuration to run unit tests with coverage reporting.
+  * Added metadata and added discovery unittests. [#29](https://github.com/singer-io/tap-listrak/pull/29)
 
 ## 1.2.1
   * Fixes error when syncing subscribed_contacts from cli [#26](https://github.com/singer-io/tap-listrak/pull/26)
