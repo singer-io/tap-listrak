@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.0
+  * Added `parent-tap-stream-id` metadata [#28](https://github.com/singer-io/tap-listrak/pull/28)
+
 ## 1.2.1
   * Fixes error when syncing subscribed_contacts from cli [#26](https://github.com/singer-io/tap-listrak/pull/26)
 
