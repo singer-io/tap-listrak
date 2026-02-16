@@ -15,6 +15,13 @@ def mock_http_timer():
         yield mock_timer
 
 
+@pytest.fixture
+def mock_sleep():
+    """Patch the time.sleep function."""
+    with patch("time.sleep", return_value=None) as mock_sleep:
+        yield mock_sleep
+
+
 def test_successful_request(mock_http_timer):
     """Test a successful SOAP request returns the expected result."""
     def service_fn(**kwargs):
