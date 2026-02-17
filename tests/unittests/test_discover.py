@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from tap_listrak import schemas, discover
 from tap_listrak.context import Context
 from singer import metadata
@@ -314,6 +314,3 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             self.assertNotEqual(inclusion, 'automatic',
                               f"{stream_id} should not have automatic stream-level inclusion")
 
-
-if __name__ == '__main__':
-    unittest.main()
