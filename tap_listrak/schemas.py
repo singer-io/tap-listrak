@@ -30,6 +30,18 @@ PK_FIELDS = {
     IDS.SUBSCRIBED_CONTACTS: ["ListID", "ContactID"],
 }
 
+REPLICATION_METHODS = {
+    IDS.LISTS: "FULL_TABLE",
+    IDS.MESSAGES: "FULL_TABLE",
+    IDS.MESSAGE_CLICKS: "FULL_TABLE",
+    IDS.MESSAGE_OPENS: "FULL_TABLE",
+    IDS.MESSAGE_READS: "FULL_TABLE",
+    IDS.MESSAGE_SENDS: "FULL_TABLE",
+    IDS.MESSAGE_UNSUBS: "FULL_TABLE",
+    IDS.MESSAGE_BOUNCES: "FULL_TABLE",
+    IDS.SUBSCRIBED_CONTACTS: "FULL_TABLE",
+}
+
 
 def get_abs_path(path):
     return os.path.join(os.path.dirname(os.path.realpath(__file__)), path)
