@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-import os
-import json
 import singer
 from singer import utils, metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
@@ -10,6 +8,17 @@ from . import schemas
 
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
+
+STREAM_DEPENDENCIES = {
+    'messages': 'lists',
+    'message_bounces': 'messages',
+    'message_clicks': 'messages',
+    'message_opens': 'messages',
+    'message_reads': 'messages',
+    'message_sends': 'messages',
+    'message_unsubs': 'messages',
+    'subscribed_contacts': 'lists'
+}
 
 
 def check_credentials_are_authorized(ctx):
@@ -24,8 +33,11 @@ def discover(ctx):
         schema_dict = schemas.load_schema(tap_stream_id)
         schema = Schema.from_dict(schema_dict)
 
-        mdata = metadata.get_standard_metadata(schema_dict,
-                                               key_properties=schemas.PK_FIELDS[tap_stream_id])
+        mdata = metadata.get_standard_metadata(
+            schema_dict,
+            replication_method=schemas.REPLICATION_METHODS[tap_stream_id],
+            key_properties=schemas.PK_FIELDS[tap_stream_id]
+        )
 
         mdata = metadata.to_map(mdata)
 
@@ -38,6 +50,9 @@ def discover(ctx):
         for field_name in schema_dict['properties'].keys():
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
 
+        if parent_stream := STREAM_DEPENDENCIES.get(tap_stream_id):
+            mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_stream)
+
         catalog.streams.append(CatalogEntry(
             stream=tap_stream_id,
             tap_stream_id=tap_stream_id,
@@ -49,21 +64,18 @@ def discover(ctx):
 
 
 def sync(ctx):
-    """ 
-    Sync function updated:
-    Dynamically finds and calls corresponding stream sync functions
-    instead of only calling hardcoded sync_lists(ctx)
     """
-    for tap_stream_id in ctx.selected_stream_ids:
-        schemas.load_and_write_schema(tap_stream_id)
+    Sync function updated to respect stream dependencies.
 
-        if hasattr(streams_, f"sync_{tap_stream_id}"):
-            sync_fn = getattr(streams_, f"sync_{tap_stream_id}")
-            LOGGER.info(f"Syncing stream: {tap_stream_id}")
-            sync_fn(ctx)
-        else:
-            LOGGER.warning(f"No sync function found for stream: {tap_stream_id}")
+    This approach is necessary because:
+    1. Child streams depend on parent stream data and cannot be synced independently
+    2. Parent streams must be synced first to provide the necessary context and IDs for their child streams
+    """
 
+    # All lists-dependent streams are synced through sync_lists
+    LOGGER.info("Syncing lists and its dependent streams")
+
+    streams_.sync_lists(ctx)
     ctx.write_state()
 
 

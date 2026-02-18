@@ -80,11 +80,9 @@ class BOOK(object):
     MESSAGE_SENDS = [IDS.MESSAGE_SENDS, "SendDate"]
 
 
-def sync_subscribed_contacts(ctx, lists=None):
+def sync_subscribed_contacts(ctx, lists):
+    schemas.load_and_write_schema(IDS.SUBSCRIBED_CONTACTS)
     start_dt = ctx.update_start_date_bookmark(BOOK.SUBSCRIBED_CONTACTS)
-    if lists is None:
-        response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
-        lists = transform(response)
     for lst in lists:
         for page in gen_pages():
             response = request(IDS.SUBSCRIBED_CONTACTS,
@@ -111,6 +109,7 @@ MESSAGE_SUB_STREAMS = [
 
 
 def sync_message_sub_stream(ctx, messages, sub_stream):
+    schemas.load_and_write_schema(sub_stream.tap_stream_id)
     start_dt = ctx.update_start_date_bookmark(sub_stream.bookmark)
     for msg in messages:
         for page in gen_pages():
@@ -135,6 +134,7 @@ def sync_sub_streams(ctx, messages):
 def sync_message_sends_if_selected(ctx, messages):
     if not IDS.MESSAGE_SENDS in ctx.selected_stream_ids:
         return
+    schemas.load_and_write_schema(IDS.MESSAGE_SENDS)
     start_dt = ctx.update_start_date_bookmark(BOOK.MESSAGE_SENDS)
     for msg in messages:
         if pendulum.parse(msg["SendDate"]) < start_dt:
@@ -168,6 +168,7 @@ def new_max_send_dt(messages, old_max):
 
 
 def sync_messages(ctx, lists):
+    schemas.load_and_write_schema(IDS.MESSAGES)
     start_dt = ctx.config["start_date"]
     max_send_dt = None
     for lst in lists:
@@ -192,8 +193,9 @@ def sync_messages(ctx, lists):
 
 
 def sync_lists(ctx):
+    schemas.load_and_write_schema(IDS.LISTS)
     response = request(IDS.LISTS, ctx.client.service.GetContactListCollection)
-    lists = transform(response)
+    lists = transform(response) or []
     write_records(IDS.LISTS, lists)
     if IDS.MESSAGES in ctx.selected_stream_ids:
         sync_messages(ctx, lists)
