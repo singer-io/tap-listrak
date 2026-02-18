@@ -9,6 +9,17 @@ from . import schemas
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
+STREAM_DEPENDENCIES = {
+    'messages': 'lists',
+    'message_bounces': 'messages',
+    'message_clicks': 'messages',
+    'message_opens': 'messages',
+    'message_reads': 'messages',
+    'message_sends': 'messages',
+    'message_unsubs': 'messages',
+    'subscribed_contacts': 'lists'
+}
+
 
 def check_credentials_are_authorized(ctx):
     pass
@@ -22,8 +33,11 @@ def discover(ctx):
         schema_dict = schemas.load_schema(tap_stream_id)
         schema = Schema.from_dict(schema_dict)
 
-        mdata = metadata.get_standard_metadata(schema_dict,
-                                               key_properties=schemas.PK_FIELDS[tap_stream_id])
+        mdata = metadata.get_standard_metadata(
+            schema_dict,
+            replication_method=schemas.REPLICATION_METHODS[tap_stream_id],
+            key_properties=schemas.PK_FIELDS[tap_stream_id]
+        )
 
         mdata = metadata.to_map(mdata)
 
@@ -35,6 +49,9 @@ def discover(ctx):
 
         for field_name in schema_dict['properties'].keys():
             mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
+
+        if parent_stream := STREAM_DEPENDENCIES.get(tap_stream_id):
+            mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_stream)
 
         catalog.streams.append(CatalogEntry(
             stream=tap_stream_id,
