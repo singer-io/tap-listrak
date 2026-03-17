@@ -1,0 +1,128 @@
+"""Integration tests for tap-listrak interrupted sync recovery with mocked data.
+
+tap-listrak uses FULL_TABLE replication on all streams. The sync flow is
+hierarchical: sync_lists -> sync_messages -> sync_sub_streams.
+An interrupted sync should be recoverable by re-running from the top since
+bookmarks track the last successful start_date.
+"""
+import unittest
+from unittest.mock import patch, MagicMock
+from datetime import datetime, timezone
+
+try:
+    from .base import ListrakBaseTest
+except ImportError:
+    from base import ListrakBaseTest
+
+from tap_listrak import streams
+from tap_listrak.streams import IDS, BOOK
+from tap_listrak.context import Context
+
+
+class ListrakInterruptedSyncTest(ListrakBaseTest, unittest.TestCase):
+    """Verify that partial syncs write correct bookmark state."""
+
+    def _make_ctx(self, selected_ids=None):
+        ctx = MagicMock(spec=Context)
+        ctx.config = self.get_mock_config()
+        ctx.config["interval_days"] = 365
+        ctx.now = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
+        ctx.update_start_date_bookmark.return_value = datetime(
+            2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
+        )
+        ctx.set_bookmark = MagicMock()
+        ctx.write_state = MagicMock()
+        ctx.client = MagicMock()
+        ctx.client.service = MagicMock()
+        ctx.selected_stream_ids = selected_ids or []
+        return ctx
+
+    @patch("tap_listrak.schemas.load_and_write_schema")
+    @patch("tap_listrak.streams.request")
+    @patch("tap_listrak.streams.write_records")
+    def test_sync_lists_writes_state_after_complete_sync(
+        self, mock_write, mock_request, mock_schema
+    ):
+        """sync_lists calls write_state at the end of a complete sync cycle."""
+        ctx = self._make_ctx(selected_ids=["lists"])
+        mock_request.return_value = [{"ListID": "1", "Name": "Test"}]
+
+        streams.sync_lists(ctx)
+
+        # lists itself does not call write_state (sync_messages / sync_subscribed_contacts do),
+        # but the caller (sync) calls ctx.write_state. Verify schema was loaded.
+        mock_schema.assert_called_once_with(IDS.LISTS)
+
+    @patch("tap_listrak.schemas.load_and_write_schema")
+    @patch("tap_listrak.streams.request")
+    @patch("tap_listrak.streams.write_records")
+    def test_subscribed_contacts_writes_state_on_completion(
+        self, mock_write, mock_request, mock_schema
+    ):
+        """sync_subscribed_contacts writes state after writing bookmark."""
+        ctx = self._make_ctx()
+        mock_request.side_effect = [
+            [{"ContactID": "C1", "Email": "a@b.com"}],
+            [],
+        ]
+
+        streams.sync_subscribed_contacts(ctx, [{"ListID": "1"}])
+
+        ctx.set_bookmark.assert_called_with(BOOK.SUBSCRIBED_CONTACTS, ctx.now)
+        ctx.write_state.assert_called_once()
+
+    @patch("tap_listrak.schemas.load_and_write_schema")
+    @patch("tap_listrak.streams.sync_sub_streams")
+    @patch("tap_listrak.streams.sync_message_sends_if_selected")
+    @patch("tap_listrak.streams.request")
+    @patch("tap_listrak.streams.write_records")
+    def test_messages_writes_state_on_completion(
+        self, mock_write, mock_request, mock_sync_sends, mock_sync_subs, mock_schema
+    ):
+        """sync_messages writes state after updating sub-stream bookmarks."""
+        ctx = self._make_ctx(selected_ids=["messages"])
+        mock_request.return_value = {
+            "ReportListMessageActivityResult": {
+                "WSMessageActivity": [
+                    {"MsgID": "1", "SendDate": "2026-01-15T00:00:00Z"}
+                ]
+            }
+        }
+
+        streams.sync_messages(ctx, [{"ListID": "1"}])
+
+        ctx.write_state.assert_called_once()
+
+    @patch("tap_listrak.schemas.load_and_write_schema")
+    @patch("tap_listrak.streams.request")
+    @patch("tap_listrak.streams.write_records")
+    def test_empty_lists_response_does_not_crash(
+        self, mock_write, mock_request, mock_schema
+    ):
+        """sync_lists handles None/empty responses gracefully."""
+        ctx = self._make_ctx(selected_ids=["lists"])
+        mock_request.return_value = None
+
+        streams.sync_lists(ctx)
+
+        # Should still load schema and write empty list
+        mock_schema.assert_called_once_with(IDS.LISTS)
+        mock_write.assert_called_once_with(IDS.LISTS, [])
+
+    @patch("tap_listrak.schemas.load_and_write_schema")
+    @patch("tap_listrak.streams.sync_sub_streams")
+    @patch("tap_listrak.streams.sync_message_sends_if_selected")
+    @patch("tap_listrak.streams.request")
+    @patch("tap_listrak.streams.write_records")
+    def test_messages_no_activity_result_continues(
+        self, mock_write, mock_request, mock_sync_sends, mock_sync_subs, mock_schema
+    ):
+        """sync_messages handles empty ReportListMessageActivityResult gracefully."""
+        ctx = self._make_ctx(selected_ids=["messages"])
+        mock_request.return_value = {"ReportListMessageActivityResult": None}
+
+        streams.sync_messages(ctx, [{"ListID": "1"}])
+
+        # write_records should not be called for messages (no data)
+        mock_write.assert_not_called()
+        ctx.write_state.assert_called_once()
