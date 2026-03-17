@@ -1,4 +1,5 @@
 import unittest
+import pendulum
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 from tap_listrak import streams
@@ -463,6 +464,53 @@ class TestSyncFunctions(unittest.TestCase):
 
         # Assert schema was loaded for message_opens
         mock_load_schema.assert_called_with(streams.IDS.MESSAGE_OPENS)
+
+class TestGenIntervals(unittest.TestCase):
+    """
+    Regression tests for the offset-naive vs offset-aware datetime comparison bug.
+
+    Previously, Context.now was set with datetime.utcnow() (naive), while
+    pendulum.parse() returns a timezone-aware datetime. Comparing them raised:
+        TypeError: can't compare offset-naive and offset-aware datetimes
+    The fix was to use pendulum.now("UTC") so that ctx.now is always
+    timezone-aware and comparable to pendulum-parsed datetimes.
+    """
+
+    def _make_ctx(self, now_dt):
+        ctx = MagicMock()
+        ctx.now = now_dt
+        ctx.config = {}
+        return ctx
+
+    def test_gen_intervals_raises_with_naive_now(self):
+        """Naive ctx.now compared to timezone-aware start_dt should raise TypeError."""
+        naive_now = datetime(2026, 3, 17, 0, 0, 0)  # no tzinfo
+        ctx = self._make_ctx(naive_now)
+        start_str = "2026-01-01T00:00:00Z"
+        with self.assertRaises(TypeError):
+            list(streams.gen_intervals(ctx, start_str))
+
+    def test_gen_intervals_works_with_aware_now(self):
+        """Timezone-aware ctx.now (pendulum) should not raise and should yield intervals."""
+        aware_now = pendulum.now("UTC")
+        ctx = self._make_ctx(aware_now)
+        start_str = "2026-01-01T00:00:00Z"
+        intervals = list(streams.gen_intervals(ctx, start_str))
+        self.assertGreater(len(intervals), 0)
+        for begin_dt, end_dt in intervals:
+            self.assertIsNotNone(begin_dt.tzinfo)
+            self.assertIsNotNone(end_dt.tzinfo)
+            self.assertLess(begin_dt, end_dt)
+
+    def test_context_now_is_timezone_aware(self):
+        """Context.now must be timezone-aware after the pendulum.now('UTC') fix."""
+        config = {"start_date": "2026-01-01T00:00:00Z", "username": "u", "password": "p"}
+        state = {}
+        with patch("tap_listrak.context.get_client", return_value=MagicMock()):
+            ctx = Context(config, state)
+        self.assertIsNotNone(ctx.now.tzinfo,
+            "ctx.now must be timezone-aware to avoid comparison errors with pendulum-parsed datetimes")
+
 
 if __name__ == '__main__':
     unittest.main()
