@@ -24,6 +24,15 @@ class ListrakStartDateTest(ListrakBaseTest, unittest.TestCase):
             self.assertIn("start_date", ctx.config)
             self.assertEqual(ctx.config["start_date"], self.default_start_date)
 
+    def test_gen_intervals_with_real_context_now(self):
+        """gen_intervals must not raise TypeError comparing aware vs naive datetimes."""
+        with patch("tap_listrak.http.zeep") as mock_zeep:
+            mock_zeep.Client.return_value = MagicMock()
+            ctx = Context(self.get_mock_config(), {})   # real ctx.now = datetime.utcnow() (naive)
+            # Would raise TypeError on unfixed code: can't compare offset-naive and offset-aware
+            intervals = list(streams.gen_intervals(ctx, "2026-01-01T00:00:00Z"))
+            self.assertGreater(len(intervals), 0)
+
     def test_update_start_date_bookmark_uses_config_when_no_bookmark(self):
         """update_start_date_bookmark falls back to config start_date when no bookmark exists."""
         with patch("tap_listrak.http.zeep") as mock_zeep:

@@ -1,6 +1,6 @@
 """Integration tests for tap-listrak stream discovery with mocked data."""
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
 from singer import metadata
 
 try:
@@ -14,10 +14,8 @@ from tap_listrak.context import Context
 
 class ListrakDiscoveryTest(ListrakBaseTest, unittest.TestCase):
 
-    @patch('tap_listrak.http.zeep')
-    def _get_catalog(self, mock_zeep):
-        """Helper to run discover with a mocked zeep client."""
-        mock_zeep.Client.return_value = MagicMock()
+    def _get_catalog(self):
+        """Helper to run discover with a mocked Context."""
         ctx = MagicMock(spec=Context)
         ctx.config = self.get_mock_config()
         return discover(ctx)

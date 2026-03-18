@@ -2,8 +2,8 @@
 
 tap-listrak uses FULL_TABLE replication on all streams. The sync flow is
 hierarchical: sync_lists -> sync_messages -> sync_sub_streams.
-An interrupted sync should be recoverable by re-running from the top since
-bookmarks track the last successful start_date.
+An interrupted sync is recoverable by re-running from the top; bookmarks
+record the last successful sync timestamp so the next run resumes correctly.
 """
 import unittest
 from unittest.mock import patch, MagicMock
@@ -40,18 +40,17 @@ class ListrakInterruptedSyncTest(ListrakBaseTest, unittest.TestCase):
     @patch("tap_listrak.schemas.load_and_write_schema")
     @patch("tap_listrak.streams.request")
     @patch("tap_listrak.streams.write_records")
-    def test_sync_lists_writes_state_after_complete_sync(
+    def test_sync_lists_loads_schema_and_writes_lists(
         self, mock_write, mock_request, mock_schema
     ):
-        """sync_lists calls write_state at the end of a complete sync cycle."""
+        """sync_lists loads the lists schema and writes list records."""
         ctx = self._make_ctx(selected_ids=["lists"])
         mock_request.return_value = [{"ListID": "1", "Name": "Test"}]
 
         streams.sync_lists(ctx)
 
-        # lists itself does not call write_state (sync_messages / sync_subscribed_contacts do),
-        # but the caller (sync) calls ctx.write_state. Verify schema was loaded.
         mock_schema.assert_called_once_with(IDS.LISTS)
+        mock_write.assert_called_once_with(IDS.LISTS, [{"ListID": "1", "Name": "Test"}])
 
     @patch("tap_listrak.schemas.load_and_write_schema")
     @patch("tap_listrak.streams.request")
