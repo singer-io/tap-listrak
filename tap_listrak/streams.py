@@ -1,5 +1,5 @@
 from collections import namedtuple
-from datetime import datetime, timedelta, date, timezone
+from datetime import timedelta, date, timezone
 import pendulum
 from zeep.helpers import serialize_object
 import singer
@@ -74,7 +74,7 @@ class BOOK(object):
     SUBSCRIBED_CONTACTS = [IDS.SUBSCRIBED_CONTACTS, "AdditionDate"]
     MESSAGE_CLICKS = [IDS.MESSAGE_CLICKS, "ClickDate"]
     MESSAGE_UNSUBS = [IDS.MESSAGE_UNSUBS, "RemovalDate"]
-    MESSAGE_BOUNCES = [IDS.MESSAGE_UNSUBS, "BounceDate"]
+    MESSAGE_BOUNCES = [IDS.MESSAGE_BOUNCES, "BounceDate"]
     MESSAGE_OPENS = [IDS.MESSAGE_OPENS, "OpenDate"]
     MESSAGE_READS = [IDS.MESSAGE_READS, "ReadDate"]
     MESSAGE_SENDS = [IDS.MESSAGE_SENDS, "SendDate"]
