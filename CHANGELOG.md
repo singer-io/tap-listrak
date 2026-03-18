@@ -1,7 +1,7 @@
 # Changelog
 
 ## 1.3.1
-  * Fix for timezone aware comparisions. [#32](https://github.com/singer-io/tap-listrak/pull/32)
+  * Fix for timezone aware comparisons. [#32](https://github.com/singer-io/tap-listrak/pull/32)
 
 ## 1.3.0
   * Refactors stream sync logic to respect parent-child dependencies. [#27](https://github.com/singer-io/tap-listrak/pull/27)
