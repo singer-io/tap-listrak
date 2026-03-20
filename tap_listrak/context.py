@@ -1,4 +1,4 @@
-from datetime import datetime, date
+from datetime import date
 import pendulum
 import singer
 from singer import bookmarks as bks_
@@ -25,7 +25,7 @@ class Context(object):
         self._catalog = None
         self.selected_stream_ids = None
         self.cache = {}
-        self.now = datetime.utcnow()
+        self.now = pendulum.now("UTC")
 
     @property
     def catalog(self):
