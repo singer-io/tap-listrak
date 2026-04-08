@@ -1,5 +1,5 @@
 from collections import namedtuple
-from datetime import datetime, timedelta, date, timezone
+from datetime import timedelta, date, timezone
 import pendulum
 from zeep.helpers import serialize_object
 import singer
@@ -74,7 +74,7 @@ class BOOK(object):
     SUBSCRIBED_CONTACTS = [IDS.SUBSCRIBED_CONTACTS, "AdditionDate"]
     MESSAGE_CLICKS = [IDS.MESSAGE_CLICKS, "ClickDate"]
     MESSAGE_UNSUBS = [IDS.MESSAGE_UNSUBS, "RemovalDate"]
-    MESSAGE_BOUNCES = [IDS.MESSAGE_UNSUBS, "BounceDate"]
+    MESSAGE_BOUNCES = [IDS.MESSAGE_BOUNCES, "BounceDate"]
     MESSAGE_OPENS = [IDS.MESSAGE_OPENS, "OpenDate"]
     MESSAGE_READS = [IDS.MESSAGE_READS, "ReadDate"]
     MESSAGE_SENDS = [IDS.MESSAGE_SENDS, "SendDate"]
@@ -147,7 +147,10 @@ def sync_message_sends_if_selected(ctx, messages):
             sent_result = response["ReportMessageContactSentResult"]
             if not sent_result:
                 break
-            records = add_msg_id(msg, transform(sent_result["WSMessageRecipient"]))
+            ws_recipients = sent_result["WSMessageRecipient"]
+            if not ws_recipients:
+                break
+            records = add_msg_id(msg, transform(ws_recipients))
             write_records(IDS.MESSAGE_SENDS, records)
 
 
@@ -182,7 +185,10 @@ def sync_messages(ctx, lists):
             act_result = response["ReportListMessageActivityResult"]
             if not act_result:
                 continue
-            messages = transform(act_result["WSMessageActivity"])
+            ws_messages = act_result["WSMessageActivity"]
+            if not ws_messages:
+                continue
+            messages = transform(ws_messages)
             write_records(IDS.MESSAGES, messages)
             max_send_dt = new_max_send_dt(messages, max_send_dt)
             sync_sub_streams(ctx, messages)
