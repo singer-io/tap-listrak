@@ -2,10 +2,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak import discover
 from tap_listrak.context import Context

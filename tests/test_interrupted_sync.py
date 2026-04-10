@@ -7,35 +7,15 @@ record the last successful sync timestamp so the next run resumes correctly.
 """
 import unittest
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak import streams
 from tap_listrak.streams import IDS, BOOK
-from tap_listrak.context import Context
 
 
-class ListrakInterruptedSyncTest(ListrakBaseTest, unittest.TestCase):
-    """Verify that partial syncs write correct bookmark state."""
-
-    def _make_ctx(self, selected_ids=None):
-        ctx = MagicMock(spec=Context)
-        ctx.config = self.get_mock_config()
-        ctx.config["interval_days"] = 365
-        ctx.now = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
-        ctx.update_start_date_bookmark.return_value = datetime(
-            2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
-        )
-        ctx.set_bookmark = MagicMock()
-        ctx.write_state = MagicMock()
-        ctx.client = MagicMock()
-        ctx.client.service = MagicMock()
-        ctx.selected_stream_ids = selected_ids or []
-        return ctx
+class ListrakSyncTest(ListrakBaseTest, unittest.TestCase):
+    """Verify normal sync behaviour for lists and related streams."""
 
     @patch("tap_listrak.schemas.load_and_write_schema")
     @patch("tap_listrak.streams.request")
@@ -51,6 +31,10 @@ class ListrakInterruptedSyncTest(ListrakBaseTest, unittest.TestCase):
 
         mock_schema.assert_called_once_with(IDS.LISTS)
         mock_write.assert_called_once_with(IDS.LISTS, [{"ListID": "1", "Name": "Test"}])
+
+
+class ListrakInterruptedSyncTest(ListrakBaseTest, unittest.TestCase):
+    """Verify that partial syncs write correct bookmark state."""
 
     @patch("tap_listrak.schemas.load_and_write_schema")
     @patch("tap_listrak.streams.request")

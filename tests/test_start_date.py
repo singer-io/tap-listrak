@@ -3,10 +3,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timezone
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak.context import Context
 from tap_listrak import streams
@@ -25,11 +22,12 @@ class ListrakStartDateTest(ListrakBaseTest, unittest.TestCase):
             self.assertEqual(ctx.config["start_date"], self.default_start_date)
 
     def test_gen_intervals_with_real_context_now(self):
-        """gen_intervals must not raise TypeError comparing aware vs naive datetimes."""
+        """gen_intervals works correctly with a timezone-aware ctx.now (pendulum.now)."""
         with patch("tap_listrak.http.zeep") as mock_zeep:
             mock_zeep.Client.return_value = MagicMock()
-            ctx = Context(self.get_mock_config(), {})   # real ctx.now = datetime.utcnow() (naive)
-            # Would raise TypeError on unfixed code: can't compare offset-naive and offset-aware
+            ctx = Context(self.get_mock_config(), {})  # ctx.now = pendulum.now("UTC") (aware)
+            # pendulum.parse and pendulum.now both produce timezone-aware datetimes,
+            # so gen_intervals can compare them without raising TypeError.
             intervals = list(streams.gen_intervals(ctx, "2026-01-01T00:00:00Z"))
             self.assertGreater(len(intervals), 0)
 
@@ -76,7 +74,7 @@ class ListrakStartDateTest(ListrakBaseTest, unittest.TestCase):
         ctx.write_state = MagicMock()
         ctx.client = MagicMock()
 
-        mock_request.side_effect = [[], []]
+        mock_request.return_value = []
 
         streams.sync_subscribed_contacts(ctx, [{"ListID": "1"}])
         ctx.update_start_date_bookmark.assert_called_once_with(BOOK.SUBSCRIBED_CONTACTS)

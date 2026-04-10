@@ -21,6 +21,10 @@ def gen_intervals(ctx, start_str):
 
 
 def gen_pages():
+    # TODO: [SAC-28750] gen_pages uses an unbounded `while True` generator; the
+    # caller must break on an empty response to terminate pagination. Consider
+    # refactoring to a finite generator that accepts a stop-condition to make
+    # pagination intent explicit and prevent infinite loops on API changes.
     page = 1
     while True:
         yield page

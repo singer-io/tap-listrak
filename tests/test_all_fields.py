@@ -1,10 +1,7 @@
 """Integration tests for tap-listrak all fields replication with mocked data."""
 import unittest
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak import schemas
 

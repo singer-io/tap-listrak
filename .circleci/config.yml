@@ -19,10 +19,23 @@ jobs:
             source /usr/local/share/virtualenvs/tap-tester/bin/activate
             stitch-validate-json /usr/local/share/virtualenvs/tap-listrak/lib/python3.12/site-packages/tap_listrak/schemas/*.json
       - run:
-          name: 'Unit Tests + Integration Tests'
+          name: 'Unit Tests'
           command: |
             source /usr/local/share/virtualenvs/tap-listrak/bin/activate
-            python -m unittest discover -s tests -v
+            uv pip install pytest coverage parameterized
+            coverage run -m pytest tests/unittests
+            coverage html
+      - store_test_results:
+          path: test_output/report.xml
+      - store_artifacts:
+          path: htmlcov
+      - run:
+          name: 'Integration Tests'
+          command: |
+            source /usr/local/share/virtualenvs/tap-listrak/bin/activate
+            uv pip install pytest coverage
+            coverage run -a -m pytest tests --ignore=tests/unittests
+            coverage html
 workflows:
   version: 2
   commit:

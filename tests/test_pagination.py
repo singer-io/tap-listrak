@@ -1,35 +1,14 @@
 """Integration tests for tap-listrak pagination with mocked data."""
 import unittest
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak import streams
-from tap_listrak.context import Context
 
 
 class ListrakPaginationTest(ListrakBaseTest, unittest.TestCase):
     """Verify page-based pagination for streams that paginate."""
-
-    def _make_ctx(self, selected_ids=None):
-        """Create a mocked Context with common defaults."""
-        ctx = MagicMock(spec=Context)
-        ctx.config = self.get_mock_config()
-        ctx.config["interval_days"] = 365
-        ctx.now = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
-        ctx.update_start_date_bookmark.return_value = datetime(
-            2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
-        )
-        ctx.set_bookmark = MagicMock()
-        ctx.write_state = MagicMock()
-        ctx.client = MagicMock()
-        ctx.client.service = MagicMock()
-        ctx.selected_stream_ids = selected_ids or []
-        return ctx
 
     @patch("tap_listrak.schemas.load_and_write_schema")
     @patch("tap_listrak.streams.request")

@@ -1,5 +1,9 @@
 import json
 import os
+from datetime import datetime, timezone
+from unittest.mock import MagicMock
+
+from tap_listrak.context import Context
 
 
 class ListrakBaseTest:
@@ -86,9 +90,21 @@ class ListrakBaseTest:
         self.config = self.get_mock_config()
         self.state = {}
 
-    def tearDown(self):
-        """Clean up after tests."""
-        pass
+    def _make_ctx(self, selected_ids=None):
+        """Create a mocked Context with common defaults for integration tests."""
+        ctx = MagicMock(spec=Context)
+        ctx.config = self.get_mock_config()
+        ctx.config["interval_days"] = 365
+        ctx.now = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
+        ctx.update_start_date_bookmark.return_value = datetime(
+            2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
+        )
+        ctx.set_bookmark = MagicMock()
+        ctx.write_state = MagicMock()
+        ctx.client = MagicMock()
+        ctx.client.service = MagicMock()
+        ctx.selected_stream_ids = selected_ids or []
+        return ctx
 
     @staticmethod
     def get_mock_config():

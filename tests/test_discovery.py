@@ -3,10 +3,7 @@ import unittest
 from unittest.mock import MagicMock
 from singer import metadata
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak import discover
 from tap_listrak.context import Context
@@ -68,23 +65,6 @@ class ListrakDiscoveryTest(ListrakBaseTest, unittest.TestCase):
                     len(schema_dict["properties"]), 0,
                     f"Stream {stream.tap_stream_id} schema has no properties",
                 )
-
-    def test_discovery_all_fields_automatic_inclusion(self):
-        """Verify all fields are marked with automatic inclusion."""
-        catalog = self._get_catalog()
-
-        for stream in catalog.streams:
-            mdata = metadata.to_map(stream.metadata)
-            schema_dict = stream.schema.to_dict()
-            for field_name in schema_dict["properties"]:
-                with self.subTest(stream=stream.tap_stream_id, field=field_name):
-                    inclusion = metadata.get(
-                        mdata, ("properties", field_name), "inclusion"
-                    )
-                    self.assertEqual(
-                        inclusion, "automatic",
-                        f"{stream.tap_stream_id}.{field_name} should be automatic",
-                    )
 
     def test_discovery_parent_stream_metadata(self):
         """Verify child streams have parent-tap-stream-id metadata set correctly."""

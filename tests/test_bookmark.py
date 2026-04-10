@@ -6,36 +6,15 @@ filter data (subscribed_contacts, message sub-streams, message_sends).
 """
 import unittest
 from unittest.mock import patch, MagicMock
-from datetime import datetime, timezone
 
-try:
-    from .base import ListrakBaseTest
-except ImportError:
-    from base import ListrakBaseTest
+from .base import ListrakBaseTest
 
 from tap_listrak import streams
 from tap_listrak.streams import BOOK
-from tap_listrak.context import Context
 
 
 class ListrakBookmarkTest(ListrakBaseTest, unittest.TestCase):
     """Verify bookmark (start-date based) behaviour for streams that use it."""
-
-    def _make_ctx(self, selected_ids=None):
-        """Create a mocked Context with common defaults."""
-        ctx = MagicMock(spec=Context)
-        ctx.config = self.get_mock_config()
-        ctx.config["interval_days"] = 365
-        ctx.now = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
-        ctx.update_start_date_bookmark.return_value = datetime(
-            2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc
-        )
-        ctx.set_bookmark = MagicMock()
-        ctx.write_state = MagicMock()
-        ctx.client = MagicMock()
-        ctx.client.service = MagicMock()
-        ctx.selected_stream_ids = selected_ids or []
-        return ctx
 
     @patch("tap_listrak.schemas.load_and_write_schema")
     @patch("tap_listrak.streams.request")
@@ -51,6 +30,8 @@ class ListrakBookmarkTest(ListrakBaseTest, unittest.TestCase):
         ]
         streams.sync_subscribed_contacts(ctx, [{"ListID": "1"}])
 
+        # Both mock responses are consumed: page 1 returns data, page 2 returns [] to stop pagination
+        self.assertEqual(mock_request.call_count, 2)
         ctx.set_bookmark.assert_called_with(BOOK.SUBSCRIBED_CONTACTS, ctx.now)
         ctx.write_state.assert_called_once()
 
@@ -107,3 +88,56 @@ class ListrakBookmarkTest(ListrakBaseTest, unittest.TestCase):
         old_max = "2026-01-15T00:00:00Z"
         result = streams.new_max_send_dt(messages, old_max)
         self.assertEqual(result, "2026-01-15T00:00:00Z")
+
+    @patch("tap_listrak.schemas.load_and_write_schema")
+    @patch("tap_listrak.streams.request")
+    @patch("tap_listrak.streams.write_records")
+    def test_subscribed_contacts_bookmark_path_is_valid_structure(
+        self, mock_write, mock_request, mock_schema
+    ):
+        """set_bookmark must be called with a two-element [stream_id, date_field] path."""
+        ctx = self._make_ctx()
+        mock_request.side_effect = [[]]
+
+        streams.sync_subscribed_contacts(ctx, [{"ListID": "1"}])
+
+        args, _ = ctx.set_bookmark.call_args
+        bookmark_path = args[0]
+        self.assertIsInstance(bookmark_path, list, "Bookmark path must be a list")
+        self.assertEqual(len(bookmark_path), 2, "Bookmark path must have exactly [stream_id, date_field]")
+        self.assertEqual(bookmark_path[0], "subscribed_contacts")
+        self.assertEqual(bookmark_path[1], "AdditionDate")
+
+    def test_message_sub_stream_bookmark_paths_are_valid_structure(self):
+        """update_sub_stream_bookmarks must call set_bookmark with valid [stream_id, date_field] paths."""
+        expected_paths = {
+            "message_clicks": ["message_clicks", "ClickDate"],
+            "message_opens": ["message_opens", "OpenDate"],
+            "message_reads": ["message_reads", "ReadDate"],
+            "message_unsubs": ["message_unsubs", "RemovalDate"],
+            "message_bounces": ["message_bounces", "BounceDate"],
+        }
+        ctx = self._make_ctx(selected_ids=list(expected_paths.keys()))
+
+        streams.update_sub_stream_bookmarks(ctx)
+
+        for call in ctx.set_bookmark.call_args_list:
+            path = call[0][0]
+            self.assertIsInstance(path, list, f"Bookmark path {path} must be a list")
+            self.assertEqual(len(path), 2, f"Bookmark path {path} must have [stream_id, date_field]")
+            self.assertIn(path, list(expected_paths.values()),
+                          f"Unexpected bookmark path {path}")
+
+    def test_message_sends_bookmark_path_is_valid_structure(self):
+        """update_message_sends_bookmark must call set_bookmark with [stream_id, date_field] path."""
+        ctx = self._make_ctx(selected_ids=["message_sends"])
+        max_dt = "2026-01-20T14:00:00Z"
+
+        streams.update_message_sends_bookmark(ctx, max_dt)
+
+        args, _ = ctx.set_bookmark.call_args
+        bookmark_path = args[0]
+        self.assertIsInstance(bookmark_path, list, "Bookmark path must be a list")
+        self.assertEqual(len(bookmark_path), 2, "Bookmark path must have exactly [stream_id, date_field]")
+        self.assertEqual(bookmark_path[0], "message_sends")
+        self.assertEqual(bookmark_path[1], "SendDate")
