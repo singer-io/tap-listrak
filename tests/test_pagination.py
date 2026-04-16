@@ -105,12 +105,6 @@ class ListrakPaginationTest(ListrakBaseTest, unittest.TestCase):
         self.assertEqual(mock_request.call_count, 2)
         self.assertEqual(mock_write.call_count, 1)
 
-    def test_gen_pages_yields_incrementing_integers(self):
-        """gen_pages yields 1, 2, 3, ... indefinitely."""
-        gen = streams.gen_pages()
-        pages = [next(gen) for _ in range(5)]
-        self.assertEqual(pages, [1, 2, 3, 4, 5])
-
     def test_gen_intervals_covers_date_range(self):
         """gen_intervals generates contiguous non-overlapping date windows."""
         ctx = self._make_ctx()

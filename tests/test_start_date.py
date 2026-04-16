@@ -26,8 +26,7 @@ class ListrakStartDateTest(ListrakBaseTest, unittest.TestCase):
         with patch("tap_listrak.http.zeep") as mock_zeep:
             mock_zeep.Client.return_value = MagicMock()
             ctx = Context(self.get_mock_config(), {})  # ctx.now = pendulum.now("UTC") (aware)
-            # pendulum.parse and pendulum.now both produce timezone-aware datetimes,
-            # so gen_intervals can compare them without raising TypeError.
+            # Verifies gen_intervals works end-to-end with a real Context (pendulum-backed ctx.now).
             intervals = list(streams.gen_intervals(ctx, "2026-01-01T00:00:00Z"))
             self.assertGreater(len(intervals), 0)
 

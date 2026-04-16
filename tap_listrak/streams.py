@@ -20,17 +20,6 @@ def gen_intervals(ctx, start_str):
         start_dt = end_dt
 
 
-def gen_pages():
-    # TODO: [SAC-28750] gen_pages uses an unbounded `while True` generator; the
-    # caller must break on an empty response to terminate pagination. Consider
-    # refactoring to a finite generator that accepts a stop-condition to make
-    # pagination intent explicit and prevent infinite loops on API changes.
-    page = 1
-    while True:
-        yield page
-        page += 1
-
-
 def metrics(tap_stream_id, records):
     with singer.metrics.record_counter(tap_stream_id) as counter:
         counter.increment(len(records))
@@ -88,7 +77,8 @@ def sync_subscribed_contacts(ctx, lists):
     schemas.load_and_write_schema(IDS.SUBSCRIBED_CONTACTS)
     start_dt = ctx.update_start_date_bookmark(BOOK.SUBSCRIBED_CONTACTS)
     for lst in lists:
-        for page in gen_pages():
+        page = 1
+        while True:
             response = request(IDS.SUBSCRIBED_CONTACTS,
                                ctx.client.service.ReportRangeSubscribedContacts,
                                ListID=lst["ListID"],
@@ -99,6 +89,7 @@ def sync_subscribed_contacts(ctx, lists):
                 break
             contacts = add_list_id(lst, transform(response))
             write_records(IDS.SUBSCRIBED_CONTACTS, contacts)
+            page += 1
     ctx.set_bookmark(BOOK.SUBSCRIBED_CONTACTS, ctx.now)
     ctx.write_state()
 
@@ -116,7 +107,8 @@ def sync_message_sub_stream(ctx, messages, sub_stream):
     schemas.load_and_write_schema(sub_stream.tap_stream_id)
     start_dt = ctx.update_start_date_bookmark(sub_stream.bookmark)
     for msg in messages:
-        for page in gen_pages():
+        page = 1
+        while True:
             response = request(sub_stream.tap_stream_id,
                                getattr(ctx.client.service, sub_stream.endpoint),
                                MsgID=msg["MsgID"],
@@ -127,6 +119,7 @@ def sync_message_sub_stream(ctx, messages, sub_stream):
                 break
             records = add_msg_id(msg, transform(response))
             write_records(sub_stream.tap_stream_id, records)
+            page += 1
 
 
 def sync_sub_streams(ctx, messages):
@@ -143,7 +136,8 @@ def sync_message_sends_if_selected(ctx, messages):
     for msg in messages:
         if pendulum.parse(msg["SendDate"]) < start_dt:
             continue
-        for page in gen_pages():
+        page = 1
+        while True:
             response = request(IDS.MESSAGE_SENDS,
                                ctx.client.service.ReportMessageContactSent,
                                MsgID=msg["MsgID"],
@@ -156,6 +150,7 @@ def sync_message_sends_if_selected(ctx, messages):
                 break
             records = add_msg_id(msg, transform(ws_recipients))
             write_records(IDS.MESSAGE_SENDS, records)
+            page += 1
 
 
 def update_sub_stream_bookmarks(ctx):
