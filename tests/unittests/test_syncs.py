@@ -565,6 +565,77 @@ class TestSyncEdgeCases(unittest.TestCase):
         mock_write_records.assert_not_called()
 
 
+class TestPaginationPageIncrement(unittest.TestCase):
+    """Verify inline page counter increments correctly."""
+
+    def setUp(self):
+        self.ctx = MagicMock(spec=Context)
+        self.ctx.update_start_date_bookmark.return_value = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        self.ctx.now = datetime(2026, 2, 2, tzinfo=timezone.utc)
+        self.ctx.set_bookmark = MagicMock()
+        self.ctx.write_state = MagicMock()
+        self.ctx.client = MagicMock()
+        self.ctx.client.service = MagicMock()
+        self.ctx.config = {'start_date': '2026-01-01T00:00:00Z', 'interval_days': 365}
+        self.ctx.selected_stream_ids = ['message_sends']
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_subscribed_contacts_page_increments(self, mock_write, mock_request, _):
+        """Page kwarg must start at 1 and increment by 1 for each call."""
+        mock_request.side_effect = [
+            [{'ContactID': '1'}],  # page 1
+            [{'ContactID': '2'}],  # page 2
+            [],                    # page 3 (empty → break)
+        ]
+        streams.sync_subscribed_contacts(self.ctx, [{'ListID': 'L1'}])
+
+        pages = [call.kwargs['Page'] for call in mock_request.call_args_list]
+        self.assertEqual(pages, [1, 2, 3])
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_message_sub_stream_page_increments(self, mock_write, mock_request, _):
+        """Page kwarg must start at 1 and increment for each message."""
+        mock_request.side_effect = [
+            [{'ClickID': '1'}],  # msg1 page 1
+            [{'ClickID': '2'}],  # msg1 page 2
+            [],                  # msg1 page 3 (empty → break)
+            [{'ClickID': '3'}],  # msg2 page 1
+            [],                  # msg2 page 2 (empty → break)
+        ]
+        sub = streams.MESSAGE_SUB_STREAMS[0]
+        messages = [
+            {'MsgID': 'M1', 'SendDate': '2026-01-10T00:00:00Z'},
+            {'MsgID': 'M2', 'SendDate': '2026-01-20T00:00:00Z'},
+        ]
+        streams.sync_message_sub_stream(self.ctx, messages, sub)
+
+        pages = [call.kwargs['Page'] for call in mock_request.call_args_list]
+        self.assertEqual(pages, [1, 2, 3, 1, 2],
+                         "Page must reset to 1 for each new message")
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_message_sends_page_increments(self, mock_write, mock_request, _):
+        """Page kwarg must start at 1 and increment for message sends."""
+        mock_request.side_effect = [
+            {'ReportMessageContactSentResult': {
+                'WSMessageRecipient': [{'Email': 'a@b.com'}]}},  # page 1
+            {'ReportMessageContactSentResult': {
+                'WSMessageRecipient': [{'Email': 'c@d.com'}]}},  # page 2
+            {'ReportMessageContactSentResult': None},             # page 3 (empty → break)
+        ]
+        messages = [{'MsgID': 'M1', 'SendDate': '2026-01-15T00:00:00Z'}]
+        streams.sync_message_sends_if_selected(self.ctx, messages)
+
+        pages = [call.kwargs['Page'] for call in mock_request.call_args_list]
+        self.assertEqual(pages, [1, 2, 3])
+
+
 class TestGenIntervals(unittest.TestCase):
     """
     Regression tests for the offset-naive vs offset-aware datetime comparison bug.
