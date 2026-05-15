@@ -7,42 +7,6 @@ MAX_RETRIES = 5
 
 
 class TestHttpRequest(unittest.TestCase):
-@pytest.fixture
-def mock_http_timer():
-    """Patch the http_request_timer context manager."""
-    with patch("tap_listrak.http.metrics.http_request_timer") as mock_timer:
-        mock_context = MagicMock()
-        mock_timer.return_value.__enter__.return_value = mock_context
-        yield mock_timer
-
-
-@pytest.fixture
-def mock_sleep():
-    """Patch the time.sleep function."""
-    with patch("time.sleep", return_value=None) as mock_sleep:
-        yield mock_sleep
-
-
-def test_successful_request(mock_http_timer):
-    """Test a successful SOAP request returns the expected result."""
-    def service_fn(**kwargs):
-        return "Success"
-
-    result = request("test_stream", service_fn)
-    assert result == "Success"
-    assert mock_http_timer.call_count == 1
-
-
-def test_xml_syntax_error_retry(mock_http_timer, mock_sleep):
-    """Test that XMLSyntaxError triggers retries up to MAX_RETRIES."""
-    failing_mock = MagicMock(side_effect=XMLSyntaxError("Simulated XML error"))
-
-    with pytest.raises(XMLSyntaxError):
-        request("test_stream", failing_mock)
-
-    assert failing_mock.call_count == MAX_RETRIES
-    assert mock_http_timer.call_count == MAX_RETRIES
-    assert mock_sleep.call_count == MAX_RETRIES - 1  # Sleep called between retries
 
     def setUp(self):
         """Start common patchers before every test."""
