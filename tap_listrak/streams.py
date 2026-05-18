@@ -147,7 +147,10 @@ def sync_message_sends_if_selected(ctx, messages):
                 break
             ws_recipients = sent_result["WSMessageRecipient"]
             if not ws_recipients:
-                break
+                LOGGER.warning("No WSMessageRecipient on page %d for MsgID %s, continuing to next page",
+                               page, msg["MsgID"])
+                page += 1
+                continue
             records = add_msg_id(msg, transform(ws_recipients))
             write_records(IDS.MESSAGE_SENDS, records)
             page += 1
