@@ -521,46 +521,50 @@ class TestSyncEdgeCases(unittest.TestCase):
     @patch('tap_listrak.schemas.load_and_write_schema')
     @patch('tap_listrak.streams.request')
     @patch('tap_listrak.streams.write_records')
-    def test_sync_message_sends_breaks_when_ws_recipients_is_none(
+    def test_sync_message_sends_continues_when_ws_recipients_is_none(
             self, mock_write_records, mock_request, mock_load_schema):
-        """sync_message_sends_if_selected must break pagination when WSMessageRecipient is None."""
+        """sync_message_sends_if_selected must continue to next page when WSMessageRecipient is None
+        (in case further pages have data), and stop only when sent_result itself is None."""
         self.ctx.selected_stream_ids = ['message_sends']
 
         messages = [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
 
-        # Page 1 returns a truthy sent_result but with WSMessageRecipient=None
-        mock_request.return_value = {
-            'ReportMessageContactSentResult': {
-                'WSMessageRecipient': None
-            }
-        }
+        # Page 1 returns a truthy sent_result but WSMessageRecipient=None (continue)
+        # Page 2 terminates the loop (sent_result is None)
+        mock_request.side_effect = [
+            {'ReportMessageContactSentResult': {'WSMessageRecipient': None}},
+            {'ReportMessageContactSentResult': None},
+        ]
 
         # Should complete without raising TypeError from add_msg_id
         streams.sync_message_sends_if_selected(self.ctx, messages)
 
+        self.assertEqual(mock_request.call_count, 2)
         mock_load_schema.assert_called_once_with(streams.IDS.MESSAGE_SENDS)
         mock_write_records.assert_not_called()
 
     @patch('tap_listrak.schemas.load_and_write_schema')
     @patch('tap_listrak.streams.request')
     @patch('tap_listrak.streams.write_records')
-    def test_sync_message_sends_breaks_when_ws_recipients_is_empty(
+    def test_sync_message_sends_continues_when_ws_recipients_is_empty(
             self, mock_write_records, mock_request, mock_load_schema):
-        """sync_message_sends_if_selected must break pagination when WSMessageRecipient is empty."""
+        """sync_message_sends_if_selected must continue to next page when WSMessageRecipient is empty
+        (in case further pages have data), and stop only when sent_result itself is None."""
         self.ctx.selected_stream_ids = ['message_sends']
 
         messages = [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
 
-        # Page returns a truthy sent_result but with an empty WSMessageRecipient list
-        mock_request.return_value = {
-            'ReportMessageContactSentResult': {
-                'WSMessageRecipient': []
-            }
-        }
+        # Page 1 returns a truthy sent_result but WSMessageRecipient=[] (continue)
+        # Page 2 terminates the loop (sent_result is None)
+        mock_request.side_effect = [
+            {'ReportMessageContactSentResult': {'WSMessageRecipient': []}},
+            {'ReportMessageContactSentResult': None},
+        ]
 
         # Should complete without entering an infinite loop or writing empty records
         streams.sync_message_sends_if_selected(self.ctx, messages)
 
+        self.assertEqual(mock_request.call_count, 2)
         mock_load_schema.assert_called_once_with(streams.IDS.MESSAGE_SENDS)
         mock_write_records.assert_not_called()
 
