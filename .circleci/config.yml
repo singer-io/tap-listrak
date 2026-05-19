@@ -25,6 +25,17 @@ jobs:
             uv pip install pytest coverage parameterized
             coverage run -m pytest tests/unittests
             coverage html
+      - store_test_results:
+          path: test_output/report.xml
+      - store_artifacts:
+          path: htmlcov
+      - run:
+          name: 'Integration Tests'
+          command: |
+            source /usr/local/share/virtualenvs/tap-listrak/bin/activate
+            uv pip install pytest coverage
+            coverage run -a -m pytest tests --ignore=tests/unittests
+            coverage html
 workflows:
   version: 2
   commit:

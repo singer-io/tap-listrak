@@ -1,5 +1,5 @@
 from collections import namedtuple
-from datetime import datetime, timedelta, date, timezone
+from datetime import timedelta, date, timezone
 import pendulum
 from zeep.helpers import serialize_object
 import singer
@@ -18,13 +18,6 @@ def gen_intervals(ctx, start_str):
         end_dt = min(start_dt + interval, ctx.now)
         yield start_dt, end_dt
         start_dt = end_dt
-
-
-def gen_pages():
-    page = 1
-    while True:
-        yield page
-        page += 1
 
 
 def metrics(tap_stream_id, records):
@@ -74,7 +67,7 @@ class BOOK(object):
     SUBSCRIBED_CONTACTS = [IDS.SUBSCRIBED_CONTACTS, "AdditionDate"]
     MESSAGE_CLICKS = [IDS.MESSAGE_CLICKS, "ClickDate"]
     MESSAGE_UNSUBS = [IDS.MESSAGE_UNSUBS, "RemovalDate"]
-    MESSAGE_BOUNCES = [IDS.MESSAGE_UNSUBS, "BounceDate"]
+    MESSAGE_BOUNCES = [IDS.MESSAGE_BOUNCES, "BounceDate"]
     MESSAGE_OPENS = [IDS.MESSAGE_OPENS, "OpenDate"]
     MESSAGE_READS = [IDS.MESSAGE_READS, "ReadDate"]
     MESSAGE_SENDS = [IDS.MESSAGE_SENDS, "SendDate"]
@@ -84,7 +77,8 @@ def sync_subscribed_contacts(ctx, lists):
     schemas.load_and_write_schema(IDS.SUBSCRIBED_CONTACTS)
     start_dt = ctx.update_start_date_bookmark(BOOK.SUBSCRIBED_CONTACTS)
     for lst in lists:
-        for page in gen_pages():
+        page = 1
+        while True:
             response = request(IDS.SUBSCRIBED_CONTACTS,
                                ctx.client.service.ReportRangeSubscribedContacts,
                                ListID=lst["ListID"],
@@ -95,6 +89,7 @@ def sync_subscribed_contacts(ctx, lists):
                 break
             contacts = add_list_id(lst, transform(response))
             write_records(IDS.SUBSCRIBED_CONTACTS, contacts)
+            page += 1
     ctx.set_bookmark(BOOK.SUBSCRIBED_CONTACTS, ctx.now)
     ctx.write_state()
 
@@ -112,7 +107,8 @@ def sync_message_sub_stream(ctx, messages, sub_stream):
     schemas.load_and_write_schema(sub_stream.tap_stream_id)
     start_dt = ctx.update_start_date_bookmark(sub_stream.bookmark)
     for msg in messages:
-        for page in gen_pages():
+        page = 1
+        while True:
             response = request(sub_stream.tap_stream_id,
                                getattr(ctx.client.service, sub_stream.endpoint),
                                MsgID=msg["MsgID"],
@@ -123,6 +119,7 @@ def sync_message_sub_stream(ctx, messages, sub_stream):
                 break
             records = add_msg_id(msg, transform(response))
             write_records(sub_stream.tap_stream_id, records)
+            page += 1
 
 
 def sync_sub_streams(ctx, messages):
@@ -139,7 +136,8 @@ def sync_message_sends_if_selected(ctx, messages):
     for msg in messages:
         if pendulum.parse(msg["SendDate"]) < start_dt:
             continue
-        for page in gen_pages():
+        page = 1
+        while True:
             response = request(IDS.MESSAGE_SENDS,
                                ctx.client.service.ReportMessageContactSent,
                                MsgID=msg["MsgID"],
@@ -147,8 +145,15 @@ def sync_message_sends_if_selected(ctx, messages):
             sent_result = response["ReportMessageContactSentResult"]
             if not sent_result:
                 break
-            records = add_msg_id(msg, transform(sent_result["WSMessageRecipient"]))
+            ws_recipients = sent_result["WSMessageRecipient"]
+            if not ws_recipients:
+                LOGGER.warning("No WSMessageRecipient on page %d for MsgID %s, continuing to next page",
+                               page, msg["MsgID"])
+                page += 1
+                continue
+            records = add_msg_id(msg, transform(ws_recipients))
             write_records(IDS.MESSAGE_SENDS, records)
+            page += 1
 
 
 def update_sub_stream_bookmarks(ctx):
@@ -182,7 +187,10 @@ def sync_messages(ctx, lists):
             act_result = response["ReportListMessageActivityResult"]
             if not act_result:
                 continue
-            messages = transform(act_result["WSMessageActivity"])
+            ws_messages = act_result["WSMessageActivity"]
+            if not ws_messages:
+                continue
+            messages = transform(ws_messages)
             write_records(IDS.MESSAGES, messages)
             max_send_dt = new_max_send_dt(messages, max_send_dt)
             sync_sub_streams(ctx, messages)

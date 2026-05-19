@@ -1,4 +1,5 @@
 import unittest
+import pendulum
 from unittest.mock import MagicMock, patch
 from datetime import datetime, timezone
 from tap_listrak import streams
@@ -463,6 +464,228 @@ class TestSyncFunctions(unittest.TestCase):
 
         # Assert schema was loaded for message_opens
         mock_load_schema.assert_called_with(streams.IDS.MESSAGE_OPENS)
+
+class TestSyncEdgeCases(unittest.TestCase):
+    """
+    Tests for edge cases where the Listrak SOAP API returns a non-null
+    result wrapper but with null or empty inner data collections.
+    """
+
+    def setUp(self):
+        self.ctx = MagicMock(spec=Context)
+        self.ctx.update_start_date_bookmark.return_value = pendulum.parse("2026-01-01T00:00:00Z")
+        self.ctx.now = pendulum.parse("2026-02-02T00:00:00Z")
+        self.ctx.set_bookmark = MagicMock()
+        self.ctx.write_state = MagicMock()
+        self.ctx.client = MagicMock()
+        self.ctx.client.service = MagicMock()
+        self.ctx.config = {'start_date': '2026-01-01T00:00:00Z', 'interval_days': 365}
+        self.ctx.selected_stream_ids = ['messages']
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_sync_messages_skips_when_ws_message_activity_is_none(
+            self, mock_write_records, mock_request, mock_load_schema):
+        """sync_messages must not crash when WSMessageActivity is None inside a truthy act_result."""
+        mock_request.return_value = {
+            'ReportListMessageActivityResult': {
+                'WSMessageActivity': None
+            }
+        }
+
+        # Should complete without raising TypeError
+        streams.sync_messages(self.ctx, [{'ListID': '1'}])
+
+        mock_load_schema.assert_called_once_with(streams.IDS.MESSAGES)
+        mock_write_records.assert_not_called()
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_sync_messages_skips_when_ws_message_activity_is_empty(
+            self, mock_write_records, mock_request, mock_load_schema):
+        """sync_messages must not crash when WSMessageActivity is an empty list."""
+        mock_request.return_value = {
+            'ReportListMessageActivityResult': {
+                'WSMessageActivity': []
+            }
+        }
+
+        # Should complete without raising ValueError from new_max_send_dt
+        streams.sync_messages(self.ctx, [{'ListID': '1'}])
+
+        mock_load_schema.assert_called_once_with(streams.IDS.MESSAGES)
+        mock_write_records.assert_not_called()
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_sync_message_sends_continues_when_ws_recipients_is_none(
+            self, mock_write_records, mock_request, mock_load_schema):
+        """sync_message_sends_if_selected must continue to next page when WSMessageRecipient is None
+        (in case further pages have data), and stop only when sent_result itself is None."""
+        self.ctx.selected_stream_ids = ['message_sends']
+
+        messages = [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
+
+        # Page 1 returns a truthy sent_result but WSMessageRecipient=None (continue)
+        # Page 2 terminates the loop (sent_result is None)
+        mock_request.side_effect = [
+            {'ReportMessageContactSentResult': {'WSMessageRecipient': None}},
+            {'ReportMessageContactSentResult': None},
+        ]
+
+        # Should complete without raising TypeError from add_msg_id
+        streams.sync_message_sends_if_selected(self.ctx, messages)
+
+        self.assertEqual(mock_request.call_count, 2)
+        mock_load_schema.assert_called_once_with(streams.IDS.MESSAGE_SENDS)
+        mock_write_records.assert_not_called()
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_sync_message_sends_continues_when_ws_recipients_is_empty(
+            self, mock_write_records, mock_request, mock_load_schema):
+        """sync_message_sends_if_selected must continue to next page when WSMessageRecipient is empty
+        (in case further pages have data), and stop only when sent_result itself is None."""
+        self.ctx.selected_stream_ids = ['message_sends']
+
+        messages = [{'MsgID': '1', 'SendDate': '2026-01-15T00:00:00Z'}]
+
+        # Page 1 returns a truthy sent_result but WSMessageRecipient=[] (continue)
+        # Page 2 terminates the loop (sent_result is None)
+        mock_request.side_effect = [
+            {'ReportMessageContactSentResult': {'WSMessageRecipient': []}},
+            {'ReportMessageContactSentResult': None},
+        ]
+
+        # Should complete without entering an infinite loop or writing empty records
+        streams.sync_message_sends_if_selected(self.ctx, messages)
+
+        self.assertEqual(mock_request.call_count, 2)
+        mock_load_schema.assert_called_once_with(streams.IDS.MESSAGE_SENDS)
+        mock_write_records.assert_not_called()
+
+
+class TestPaginationPageIncrement(unittest.TestCase):
+    """Verify inline page counter increments correctly."""
+
+    def setUp(self):
+        self.ctx = MagicMock(spec=Context)
+        self.ctx.update_start_date_bookmark.return_value = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        self.ctx.now = datetime(2026, 2, 2, tzinfo=timezone.utc)
+        self.ctx.set_bookmark = MagicMock()
+        self.ctx.write_state = MagicMock()
+        self.ctx.client = MagicMock()
+        self.ctx.client.service = MagicMock()
+        self.ctx.config = {'start_date': '2026-01-01T00:00:00Z', 'interval_days': 365}
+        self.ctx.selected_stream_ids = ['message_sends']
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_subscribed_contacts_page_increments(self, mock_write, mock_request, _):
+        """Page kwarg must start at 1 and increment by 1 for each call."""
+        mock_request.side_effect = [
+            [{'ContactID': '1'}],  # page 1
+            [{'ContactID': '2'}],  # page 2
+            [],                    # page 3 (empty → break)
+        ]
+        streams.sync_subscribed_contacts(self.ctx, [{'ListID': 'L1'}])
+
+        pages = [call.kwargs['Page'] for call in mock_request.call_args_list]
+        self.assertEqual(pages, [1, 2, 3])
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_message_sub_stream_page_increments(self, mock_write, mock_request, _):
+        """Page kwarg must start at 1 and increment for each message."""
+        mock_request.side_effect = [
+            [{'ClickID': '1'}],  # msg1 page 1
+            [{'ClickID': '2'}],  # msg1 page 2
+            [],                  # msg1 page 3 (empty → break)
+            [{'ClickID': '3'}],  # msg2 page 1
+            [],                  # msg2 page 2 (empty → break)
+        ]
+        sub = streams.MESSAGE_SUB_STREAMS[0]
+        messages = [
+            {'MsgID': 'M1', 'SendDate': '2026-01-10T00:00:00Z'},
+            {'MsgID': 'M2', 'SendDate': '2026-01-20T00:00:00Z'},
+        ]
+        streams.sync_message_sub_stream(self.ctx, messages, sub)
+
+        pages = [call.kwargs['Page'] for call in mock_request.call_args_list]
+        self.assertEqual(pages, [1, 2, 3, 1, 2],
+                         "Page must reset to 1 for each new message")
+
+    @patch('tap_listrak.schemas.load_and_write_schema')
+    @patch('tap_listrak.streams.request')
+    @patch('tap_listrak.streams.write_records')
+    def test_message_sends_page_increments(self, mock_write, mock_request, _):
+        """Page kwarg must start at 1 and increment for message sends."""
+        mock_request.side_effect = [
+            {'ReportMessageContactSentResult': {
+                'WSMessageRecipient': [{'Email': 'a@b.com'}]}},  # page 1
+            {'ReportMessageContactSentResult': {
+                'WSMessageRecipient': [{'Email': 'c@d.com'}]}},  # page 2
+            {'ReportMessageContactSentResult': None},             # page 3 (empty → break)
+        ]
+        messages = [{'MsgID': 'M1', 'SendDate': '2026-01-15T00:00:00Z'}]
+        streams.sync_message_sends_if_selected(self.ctx, messages)
+
+        pages = [call.kwargs['Page'] for call in mock_request.call_args_list]
+        self.assertEqual(pages, [1, 2, 3])
+
+
+class TestGenIntervals(unittest.TestCase):
+    """
+    Regression tests for the offset-naive vs offset-aware datetime comparison bug.
+
+    Previously, Context.now was set with datetime.utcnow() (naive), while
+    pendulum.parse() returns a timezone-aware datetime. Comparing them raised:
+        TypeError: can't compare offset-naive and offset-aware datetimes
+    The fix was to use pendulum.now("UTC") so that ctx.now is always
+    timezone-aware and comparable to pendulum-parsed datetimes.
+    """
+
+    def _make_ctx(self, now_dt):
+        ctx = MagicMock()
+        ctx.now = now_dt
+        ctx.config = {}
+        return ctx
+
+    def test_gen_intervals_raises_with_naive_now(self):
+        """Naive ctx.now compared to timezone-aware start_dt should raise TypeError."""
+        naive_now = datetime(2026, 3, 17, 0, 0, 0)  # no tzinfo
+        ctx = self._make_ctx(naive_now)
+        start_str = "2026-01-01T00:00:00Z"
+        with self.assertRaises(TypeError):
+            list(streams.gen_intervals(ctx, start_str))
+
+    def test_gen_intervals_works_with_aware_now(self):
+        """Timezone-aware ctx.now (pendulum) should not raise and should yield intervals."""
+        aware_now = pendulum.now("UTC")
+        ctx = self._make_ctx(aware_now)
+        start_str = "2026-01-01T00:00:00Z"
+        intervals = list(streams.gen_intervals(ctx, start_str))
+        self.assertGreater(len(intervals), 0)
+        for begin_dt, end_dt in intervals:
+            self.assertIsNotNone(begin_dt.tzinfo)
+            self.assertIsNotNone(end_dt.tzinfo)
+            self.assertLess(begin_dt, end_dt)
+
+    def test_context_now_is_timezone_aware(self):
+        """Context.now must be timezone-aware after the pendulum.now('UTC') fix."""
+        config = {"start_date": "2026-01-01T00:00:00Z", "username": "u", "password": "p"}
+        state = {}
+        with patch("tap_listrak.context.get_client", return_value=MagicMock()):
+            ctx = Context(config, state)
+        self.assertIsNotNone(ctx.now.tzinfo,
+            "ctx.now must be timezone-aware to avoid comparison errors with pendulum-parsed datetimes")
+
 
 if __name__ == '__main__':
     unittest.main()
