@@ -4,6 +4,7 @@
   * Fix for timezone aware comparisons. [#32](https://github.com/singer-io/tap-listrak/pull/32)
   * Fixes `sync_messages` to handle `WSMessageActivity` being `None` or an empty list inside a truthy `ReportListMessageActivityResult`, preventing `TypeError` and `ValueError` crashes.
   * Fixes `sync_message_sends_if_selected` to break pagination when `WSMessageRecipient` is `None` or empty inside a truthy `ReportMessageContactSentResult`, preventing `TypeError` crashes and infinite loops.
+  * Bump requests from 2.32.5 to 2.33.0 [#35](https://github.com/singer-io/tap-listrak/pull/35)
 
 ## 1.3.0
   * Refactors stream sync logic to respect parent-child dependencies. [#27](https://github.com/singer-io/tap-listrak/pull/27)
