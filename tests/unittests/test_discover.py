@@ -1,8 +1,22 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
+from zeep.exceptions import Fault
 from tap_listrak import schemas, discover
+from tap_listrak.__init__ import (
+    STREAM_DEPENDENCIES,
+    _PROBEABLE_STREAMS,
+    _prune_inaccessible_children,
+    check_credentials_are_authorized,
+)
+from tap_listrak.http import ListrakForbiddenError
 from tap_listrak.context import Context
 from singer import metadata
+
+
+# ---------------------------------------------------------------------------
+# Note: existing catalog-structure test classes use MagicMock() (no spec) so
+# that ctx.client is auto-created and the SOAP probe in discover() succeeds.
+# ---------------------------------------------------------------------------
 
 
 class TestDiscoverMetadata(unittest.TestCase):
@@ -10,7 +24,7 @@ class TestDiscoverMetadata(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.ctx = MagicMock(spec=Context)
+        self.ctx = MagicMock()  # no spec: client attribute auto-created for SOAP probe
         self.ctx.config = {
             'start_date': '2026-01-01T00:00:00Z',
             'username': 'test_user',
@@ -265,7 +279,7 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             'properties': {'id': {'type': 'integer'}}
         }
 
-        ctx = MagicMock(spec=Context)
+        ctx = MagicMock()  # no spec: client auto-created for SOAP probe
         catalog = discover(ctx)
 
         # lists has no parent
@@ -291,7 +305,7 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             'properties': {'id': {'type': 'integer'}}
         }
 
-        ctx = MagicMock(spec=Context)
+        ctx = MagicMock()  # no spec: client auto-created for SOAP probe
         catalog = discover(ctx)
 
         # lists and messages should have automatic inclusion
@@ -313,4 +327,141 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             # The stream-level inclusion should be None or 'available'
             self.assertNotEqual(inclusion, 'automatic',
                               f"{stream_id} should not have automatic stream-level inclusion")
+
+
+# ---------------------------------------------------------------------------
+# Tests for check_credentials_are_authorized
+# ---------------------------------------------------------------------------
+
+class TestCheckCredentialsAuthorized(unittest.TestCase):
+
+    def _make_ctx(self, fault=None):
+        ctx = MagicMock()  # no spec: client attribute auto-created
+        if fault:
+            ctx.client.service.GetContactListCollection.side_effect = fault
+        return ctx
+
+    def test_succeeds_when_lists_accessible(self):
+        """No exception raised when GetContactListCollection returns successfully."""
+        ctx = self._make_ctx()
+        try:
+            check_credentials_are_authorized(ctx)
+        except ListrakForbiddenError:
+            self.fail("check_credentials_are_authorized raised unexpectedly")
+
+    def test_raises_forbidden_on_fault(self):
+        """ListrakForbiddenError raised when SOAP service returns a Fault."""
+        ctx = self._make_ctx(fault=Fault("Access denied"))
+        with self.assertRaises(ListrakForbiddenError):
+            check_credentials_are_authorized(ctx)
+
+    def test_forbidden_error_contains_fault_message(self):
+        """The raised error message includes the original Fault message."""
+        ctx = self._make_ctx(fault=Fault("InvalidLogonAttempt"))
+        with self.assertRaises(ListrakForbiddenError) as cm:
+            check_credentials_are_authorized(ctx)
+        self.assertIn("InvalidLogonAttempt", str(cm.exception))
+
+    def test_probes_get_contact_list_collection(self):
+        """Verifies the exact SOAP method used for the access probe."""
+        ctx = self._make_ctx()
+        check_credentials_are_authorized(ctx)
+        ctx.client.service.GetContactListCollection.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Tests for _prune_inaccessible_children
+# ---------------------------------------------------------------------------
+
+class TestPruneInaccessibleChildren(unittest.TestCase):
+
+    def test_messages_removed_when_lists_inaccessible(self):
+        accessible = set(schemas.stream_ids) - {'lists'}
+        inaccessible = {'lists'}
+        _prune_inaccessible_children(accessible, inaccessible)
+        self.assertNotIn('messages', accessible)
+        self.assertNotIn('subscribed_contacts', accessible)
+
+    def test_message_substreams_cascade_when_lists_inaccessible(self):
+        """Removing lists cascades to messages, then to all message_* streams."""
+        accessible = set(schemas.stream_ids) - {'lists'}
+        inaccessible = {'lists'}
+        _prune_inaccessible_children(accessible, inaccessible)
+        for child in ('message_clicks', 'message_opens', 'message_reads',
+                      'message_sends', 'message_unsubs', 'message_bounces'):
+            self.assertNotIn(child, accessible)
+
+    def test_message_substreams_removed_when_messages_inaccessible(self):
+        accessible = set(schemas.stream_ids) - {'messages'}
+        inaccessible = {'messages'}
+        _prune_inaccessible_children(accessible, inaccessible)
+        for child in ('message_clicks', 'message_opens', 'message_reads',
+                      'message_sends', 'message_unsubs', 'message_bounces'):
+            self.assertNotIn(child, accessible)
+
+    def test_lists_kept_when_no_parent_absent(self):
+        accessible = set(schemas.stream_ids)
+        inaccessible = set()
+        _prune_inaccessible_children(accessible, inaccessible)
+        self.assertIn('lists', accessible)
+        self.assertIn('messages', accessible)
+
+    def test_pruned_streams_added_to_inaccessible(self):
+        accessible = set(schemas.stream_ids) - {'lists'}
+        inaccessible = {'lists'}
+        _prune_inaccessible_children(accessible, inaccessible)
+        self.assertIn('messages', inaccessible)
+        self.assertIn('subscribed_contacts', inaccessible)
+
+
+# ---------------------------------------------------------------------------
+# Tests for discover() access-check integration
+# ---------------------------------------------------------------------------
+
+class TestDiscoverAccessChecks(unittest.TestCase):
+
+    def _make_ctx(self, fault_on_lists=False):
+        ctx = MagicMock()  # no spec: client attribute auto-created
+        if fault_on_lists:
+            ctx.client.service.GetContactListCollection.side_effect = Fault("Access denied")
+        return ctx
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_all_streams_when_lists_accessible(self, mock_load_schema):
+        mock_load_schema.return_value = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
+        ctx = self._make_ctx()
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        self.assertEqual(stream_ids, set(schemas.stream_ids))
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_raises_when_lists_inaccessible(self, mock_load_schema):
+        mock_load_schema.return_value = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
+        ctx = self._make_ctx(fault_on_lists=True)
+        with self.assertRaises(ListrakForbiddenError):
+            discover(ctx)
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_excludes_lists_and_all_children_when_forbidden(self, mock_load_schema):
+        """When lists is forbidden, catalog must be empty → ListrakForbiddenError raised."""
+        mock_load_schema.return_value = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
+        ctx = self._make_ctx(fault_on_lists=True)
+        with self.assertRaises(ListrakForbiddenError) as cm:
+            discover(ctx)
+        self.assertIn("403", str(cm.exception))
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_probes_lists_endpoint(self, mock_load_schema):
+        mock_load_schema.return_value = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
+        ctx = self._make_ctx()
+        discover(ctx)
+        ctx.client.service.GetContactListCollection.assert_called_once()
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_does_not_skip_schema_load_for_accessible_streams(self, mock_load_schema):
+        """All accessible stream schemas must be loaded during discovery."""
+        mock_load_schema.return_value = {'type': 'object', 'properties': {'id': {'type': 'integer'}}}
+        ctx = self._make_ctx()
+        discover(ctx)
+        self.assertEqual(mock_load_schema.call_count, len(schemas.stream_ids))
 
