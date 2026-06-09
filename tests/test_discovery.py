@@ -14,6 +14,7 @@ class ListrakDiscoveryTest(ListrakBaseTest, unittest.TestCase):
     def _get_catalog(self):
         """Helper to run discover with a mocked Context."""
         ctx = MagicMock(spec=Context)
+        ctx.client = MagicMock()  # allow SOAP probe call in discover()
         ctx.config = self.get_mock_config()
         return discover(ctx)
 
