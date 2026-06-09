@@ -79,18 +79,19 @@ def discover(ctx):
     inaccessible = set()
     accessible_stream_ids = set(schemas.stream_ids)
 
-    # Probe root-level streams that can be checked without data IDs
-    for stream_id, service_method in _PROBEABLE_STREAMS.items():
-        try:
-            getattr(ctx.client.service, service_method)()
-        except Fault as e:
-            LOGGER.warning(
-                "Stream '%s' does not have read permission, excluding from catalog: %s",
-                stream_id,
-                e,
-            )
-            accessible_stream_ids.discard(stream_id)
-            inaccessible.add(stream_id)
+    # Probe root-level streams that can be checked without data IDs.
+    # Reuse check_credentials_are_authorized() so probe logic stays in one place.
+    try:
+        check_credentials_are_authorized(ctx)
+    except ListrakForbiddenError as e:
+        stream_id = next(iter(_PROBEABLE_STREAMS))
+        LOGGER.warning(
+            "Stream '%s' does not have read permission, excluding from catalog: %s",
+            stream_id,
+            e,
+        )
+        accessible_stream_ids.discard(stream_id)
+        inaccessible.add(stream_id)
 
     _prune_inaccessible_children(accessible_stream_ids, inaccessible)
 

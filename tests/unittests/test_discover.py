@@ -1,15 +1,12 @@
 import unittest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from zeep.exceptions import Fault
 from tap_listrak import schemas, discover
 from tap_listrak.__init__ import (
-    STREAM_DEPENDENCIES,
-    _PROBEABLE_STREAMS,
     _prune_inaccessible_children,
     check_credentials_are_authorized,
 )
 from tap_listrak.http import ListrakForbiddenError
-from tap_listrak.context import Context
 from singer import metadata
 
 

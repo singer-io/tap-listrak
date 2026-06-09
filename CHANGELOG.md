@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.3.2
+## 1.4.0
   * Exclude 403-forbidden streams from discovery [#36](https://github.com/singer-io/tap-listrak/pull/36)
   * Bump dependencies for compliance
 
