@@ -349,10 +349,12 @@ class TestCheckCredentialsAuthorized(unittest.TestCase):
         result = check_credentials_are_authorized(ctx)
         self.assertEqual(result, 7)
 
-    def test_returns_none_when_lists_empty(self):
+    def test_raises_when_lists_empty(self):
         ctx = MagicMock()
         ctx.client.service.GetContactListCollection.return_value = []
-        self.assertIsNone(check_credentials_are_authorized(ctx))
+        with self.assertRaises(ListrakForbiddenError) as cm:
+            check_credentials_are_authorized(ctx)
+        self.assertIn("403", str(cm.exception))
 
     def test_raises_forbidden_on_fault(self):
         ctx = self._make_ctx(fault=Fault("Access denied"))
@@ -509,17 +511,14 @@ class TestDiscoverAccessChecks(unittest.TestCase):
         self.assertEqual(stream_ids, set(schemas.stream_ids))
 
     @patch('tap_listrak.schemas.load_schema')
-    def test_all_child_probes_skipped_when_no_lists(self, mock_load_schema):
-        """Empty GetContactListCollection → no child probes, all streams in catalog."""
+    def test_raises_when_no_lists_in_account(self, mock_load_schema):
+        """Empty GetContactListCollection raises ListrakForbiddenError."""
         mock_load_schema.return_value = self._SIMPLE_SCHEMA
         ctx = MagicMock()
         ctx.client.service.GetContactListCollection.return_value = []
-        catalog = discover(ctx)
-        ctx.client.service.ReportListMessageActivity.assert_not_called()
-        ctx.client.service.ReportRangeSubscribedContacts.assert_not_called()
-        self.assertEqual(
-            {s.tap_stream_id for s in catalog.streams}, set(schemas.stream_ids)
-        )
+        with self.assertRaises(ListrakForbiddenError) as cm:
+            discover(ctx)
+        self.assertIn("403", str(cm.exception))
 
     @patch('tap_listrak.schemas.load_schema')
     def test_schema_loaded_only_for_accessible_streams(self, mock_load_schema):

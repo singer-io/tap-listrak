@@ -45,7 +45,13 @@ def check_credentials_are_authorized(ctx):
         response = ctx.client.service.GetContactListCollection()
         LOGGER.info("Stream 'lists' is accessible.")
         lists = response or []
-        return lists[0].ListID if lists else None
+        if not lists:
+            raise ListrakForbiddenError(
+                "HTTP-error-code: 403, Error: The account credentials supplied do not have "
+                "'read' access to any of the streams supported by the tap. "
+                "Data collection cannot be initiated: No lists found in the account."
+            )
+        return lists[0].ListID
     except Fault as e:
         raise ListrakForbiddenError(
             "HTTP-error-code: 403, Error: The account credentials supplied do not have "
@@ -142,39 +148,32 @@ def discover(ctx):
     inaccessible = set()
     accessible_stream_ids = set(schemas.stream_ids)
 
-    # Step 1: probe 'lists' — raises immediately if inaccessible.
+    # Step 1: probe 'lists' — raises immediately if inaccessible or empty.
     list_id = check_credentials_are_authorized(ctx)
 
-    if list_id is not None:
-        # Step 2: probe 'messages' and 'subscribed_contacts' with the ListID.
-        messages_accessible, msg_id = _probe_list_dependent(ctx, 'messages', list_id)
-        if not messages_accessible:
-            accessible_stream_ids.discard('messages')
-            inaccessible.add('messages')
+    # Step 2: probe 'messages' and 'subscribed_contacts' with the ListID.
+    messages_accessible, msg_id = _probe_list_dependent(ctx, 'messages', list_id)
+    if not messages_accessible:
+        accessible_stream_ids.discard('messages')
+        inaccessible.add('messages')
+        _prune_inaccessible_children(accessible_stream_ids, inaccessible)
 
-        sc_accessible, _ = _probe_list_dependent(ctx, 'subscribed_contacts', list_id)
-        if not sc_accessible:
-            accessible_stream_ids.discard('subscribed_contacts')
-            inaccessible.add('subscribed_contacts')
+    sc_accessible, _ = _probe_list_dependent(ctx, 'subscribed_contacts', list_id)
+    if not sc_accessible:
+        accessible_stream_ids.discard('subscribed_contacts')
+        inaccessible.add('subscribed_contacts')
 
-        # Step 3: probe message_* sub-streams with the MsgID.
-        if messages_accessible and msg_id is not None:
-            for stream_id in _MESSAGE_SUBSTREAM_ENDPOINTS:
-                if not _probe_message_substream(ctx, stream_id, msg_id):
-                    accessible_stream_ids.discard(stream_id)
-                    inaccessible.add(stream_id)
-        elif messages_accessible:
-            LOGGER.warning(
-                "No messages found in account history; skipping access check for "
-                "message_* sub-streams — they will be included in the catalog."
-            )
-    else:
+    # Step 3: probe message_* sub-streams with the MsgID.
+    if messages_accessible and msg_id is not None:
+        for stream_id in _MESSAGE_SUBSTREAM_ENDPOINTS:
+            if not _probe_message_substream(ctx, stream_id, msg_id):
+                accessible_stream_ids.discard(stream_id)
+                inaccessible.add(stream_id)
+    elif messages_accessible:
         LOGGER.warning(
-            "No lists found in the account; skipping access check for child streams."
+            "No messages found in account history; skipping access check for "
+            "message_* sub-streams — they will be included in the catalog."
         )
-
-    # Cascade: remove message_* children if messages was excluded.
-    _prune_inaccessible_children(accessible_stream_ids, inaccessible)
 
     if inaccessible:
         LOGGER.warning(
