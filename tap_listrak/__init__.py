@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pendulum
 import singer
 from singer import utils, metadata
 from singer.catalog import Catalog, CatalogEntry, Schema
@@ -12,7 +13,6 @@ REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
 
 # Maps each child stream to its direct parent stream.
-# Used to cascade-remove children when a parent stream is inaccessible.
 STREAM_DEPENDENCIES = {
     'messages': 'lists',
     'message_bounces': 'messages',
@@ -24,40 +24,104 @@ STREAM_DEPENDENCIES = {
     'subscribed_contacts': 'lists'
 }
 
-# Only 'lists' can be probed during discovery without needing data IDs from
-# a prior API call. Child streams (messages, message_*, subscribed_contacts)
-# all require ListID or MsgID obtained at sync time.
-_PROBEABLE_STREAMS = {
-    'lists': 'GetContactListCollection',
+# SOAP endpoints for streams requiring a MsgID.
+_MESSAGE_SUBSTREAM_ENDPOINTS = {
+    'message_clicks':  'ReportRangeMessageContactClick',
+    'message_opens':   'ReportRangeMessageContactOpen',
+    'message_reads':   'ReportRangeMessageContactRead',
+    'message_unsubs':  'ReportRangeMessageContactRemoval',
+    'message_bounces': 'ReportRangeMessageContactBounces',
+    'message_sends':   'ReportMessageContactSent',
 }
 
 
 def check_credentials_are_authorized(ctx):
     """
-    Probe the 'lists' stream via GetContactListCollection to verify the
-    account credentials have read access to the Listrak SOAP API.
-
-    A zeep.Fault exception indicates the credentials lack sufficient access.
-    Raises ListrakForbiddenError if the probe fails.
-
-    Since 'lists' is the root dependency for all streams, a failed probe
-    means no data can be collected.
+    Probe the 'lists' stream via GetContactListCollection.
+    Returns the first ListID from the response, or None if the account has no lists.
+    Raises ListrakForbiddenError if credentials lack read access.
     """
     try:
-        ctx.client.service.GetContactListCollection()
-        LOGGER.info("Listrak credentials verified: 'lists' stream is accessible.")
+        response = ctx.client.service.GetContactListCollection()
+        LOGGER.info("Stream 'lists' is accessible.")
+        lists = response or []
+        return lists[0].ListID if lists else None
     except Fault as e:
         raise ListrakForbiddenError(
-            "Error: The account credentials supplied do not have 'read' access "
-            "to the Listrak API. Data collection cannot be initiated: {}".format(e)
+            "HTTP-error-code: 403, Error: The account credentials supplied do not have "
+            "'read' access to any of the streams supported by the tap. "
+            "Data collection cannot be initiated: {}".format(e)
         ) from e
+
+
+def _probe_list_dependent(ctx, stream_id, list_id):
+    """
+    Probe 'messages' or 'subscribed_contacts' using a real ListID.
+    Uses a 365-day look-back to maximise the chance of finding message data.
+    Returns (is_accessible, msg_id_or_None).
+      - For 'messages': msg_id is the first MsgID found in the response (or None).
+      - For 'subscribed_contacts': msg_id is always None.
+    """
+    now = pendulum.now("UTC")
+    start = now.subtract(days=365)
+    try:
+        if stream_id == 'messages':
+            response = ctx.client.service.ReportListMessageActivity(
+                ListID=list_id, StartDate=start, EndDate=now, IncludeTestMessages=True
+            )
+            LOGGER.info("Stream 'messages' is accessible.")
+            msg_id = None
+            try:
+                act_result = response["ReportListMessageActivityResult"]
+                ws_messages = act_result["WSMessageActivity"] if act_result else None
+                if ws_messages:
+                    msg_id = ws_messages[0]["MsgID"]
+            except (TypeError, KeyError, IndexError):
+                pass
+            return True, msg_id
+        elif stream_id == 'subscribed_contacts':
+            ctx.client.service.ReportRangeSubscribedContacts(
+                ListID=list_id, StartDate=start, EndDate=now, Page=1
+            )
+            LOGGER.info("Stream 'subscribed_contacts' is accessible.")
+            return True, None
+    except Fault as e:
+        LOGGER.warning(
+            "Stream '%s' does not have read permission, excluding from catalog: %s",
+            stream_id, e,
+        )
+        return False, None
+
+
+def _probe_message_substream(ctx, stream_id, msg_id):
+    """
+    Probe a message_* sub-stream using a real MsgID.
+    Returns True if accessible, False if a Fault is raised.
+    """
+    now = pendulum.now("UTC")
+    start = now.subtract(days=365)
+    endpoint = _MESSAGE_SUBSTREAM_ENDPOINTS[stream_id]
+    kwargs = {'MsgID': msg_id, 'Page': 1}
+    if stream_id != 'message_sends':
+        kwargs.update({'StartDate': start, 'EndDate': now})
+    try:
+        getattr(ctx.client.service, endpoint)(**kwargs)
+        LOGGER.info("Stream '%s' is accessible.", stream_id)
+        return True
+    except Fault as e:
+        LOGGER.warning(
+            "Stream '%s' does not have read permission, excluding from catalog: %s",
+            stream_id, e,
+        )
+        return False
 
 
 def _prune_inaccessible_children(stream_ids, inaccessible):
     """
-    Remove child streams from stream_ids whose parent stream is inaccessible.
-    Runs iteratively to handle multi-level cascading (lists → messages → message_*).
-    Mutates stream_ids in place.
+    Cascade-remove child streams whose parent was marked inaccessible.
+    Used when messages was blocked (without a MsgID probe) to ensure
+    all message_* streams are also removed.
+    Runs iteratively to handle multi-level chains.
     """
     changed = True
     while changed:
@@ -67,8 +131,7 @@ def _prune_inaccessible_children(stream_ids, inaccessible):
                 LOGGER.warning(
                     "Stream '%s' excluded from catalog because its parent "
                     "stream '%s' is not accessible.",
-                    child,
-                    parent,
+                    child, parent,
                 )
                 stream_ids.discard(child)
                 inaccessible.add(child)
@@ -79,28 +142,39 @@ def discover(ctx):
     inaccessible = set()
     accessible_stream_ids = set(schemas.stream_ids)
 
-    # Probe root-level streams that can be checked without data IDs.
-    # Reuse check_credentials_are_authorized() so probe logic stays in one place.
-    try:
-        check_credentials_are_authorized(ctx)
-    except ListrakForbiddenError as e:
-        stream_id = next(iter(_PROBEABLE_STREAMS))
+    # Step 1: probe 'lists' — raises immediately if inaccessible.
+    list_id = check_credentials_are_authorized(ctx)
+
+    if list_id is not None:
+        # Step 2: probe 'messages' and 'subscribed_contacts' with the ListID.
+        messages_accessible, msg_id = _probe_list_dependent(ctx, 'messages', list_id)
+        if not messages_accessible:
+            accessible_stream_ids.discard('messages')
+            inaccessible.add('messages')
+
+        sc_accessible, _ = _probe_list_dependent(ctx, 'subscribed_contacts', list_id)
+        if not sc_accessible:
+            accessible_stream_ids.discard('subscribed_contacts')
+            inaccessible.add('subscribed_contacts')
+
+        # Step 3: probe message_* sub-streams with the MsgID.
+        if messages_accessible and msg_id is not None:
+            for stream_id in _MESSAGE_SUBSTREAM_ENDPOINTS:
+                if not _probe_message_substream(ctx, stream_id, msg_id):
+                    accessible_stream_ids.discard(stream_id)
+                    inaccessible.add(stream_id)
+        elif messages_accessible:
+            LOGGER.warning(
+                "No messages found in account history; skipping access check for "
+                "message_* sub-streams — they will be included in the catalog."
+            )
+    else:
         LOGGER.warning(
-            "Stream '%s' does not have read permission, excluding from catalog: %s",
-            stream_id,
-            e,
+            "No lists found in the account; skipping access check for child streams."
         )
-        accessible_stream_ids.discard(stream_id)
-        inaccessible.add(stream_id)
 
+    # Cascade: remove message_* children if messages was excluded.
     _prune_inaccessible_children(accessible_stream_ids, inaccessible)
-
-    if not accessible_stream_ids:
-        raise ListrakForbiddenError(
-            "HTTP-error-code: 403, Error: The account credentials supplied do not have "
-            "'read' access to any of the streams supported by the tap. Data collection "
-            "cannot be initiated due to lack of permissions."
-        )
 
     if inaccessible:
         LOGGER.warning(
