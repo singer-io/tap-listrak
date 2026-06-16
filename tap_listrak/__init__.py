@@ -47,16 +47,14 @@ def check_credentials_are_authorized(ctx):
         lists = response or []
         if not lists:
             raise ListrakForbiddenError(
-                "HTTP-error-code: 403, Error: The account credentials supplied do not have "
-                "'read' access to any of the streams supported by the tap. "
-                "Data collection cannot be initiated: No lists found in the account."
+                "HTTP-error-code: 403, Error: Credentials are valid but "
+                "no lists were found in the account."
             )
         return lists[0].ListID
     except Fault as e:
         raise ListrakForbiddenError(
-            "HTTP-error-code: 403, Error: The account credentials supplied do not have "
-            "'read' access to any of the streams supported by the tap. "
-            "Data collection cannot be initiated: {}".format(e)
+            "HTTP-error-code: 403, Error: The credentials do not have "
+            "'read' access to any supported streams: %s" % e
         ) from e
 
 
@@ -171,14 +169,13 @@ def discover(ctx):
                 inaccessible.add(stream_id)
     elif messages_accessible:
         LOGGER.warning(
-            "No messages found in account history; skipping access check for "
-            "message_* sub-streams — they will be included in the catalog."
+            "No messages found in account history; message_* sub-streams "
+            "included in catalog without access check."
         )
 
     if inaccessible:
         LOGGER.warning(
-            "The account credentials supplied do not have 'read' access to the "
-            "following stream(s): %s. These streams have been excluded from the catalog.",
+            "No 'read' access to stream(s): %s. Excluded from catalog.",
             ", ".join(sorted(inaccessible)),
         )
 
