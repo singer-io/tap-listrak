@@ -352,9 +352,8 @@ class TestCheckCredentialsAuthorized(unittest.TestCase):
     def test_raises_when_lists_empty(self):
         ctx = MagicMock()
         ctx.client.service.GetContactListCollection.return_value = []
-        with self.assertRaises(ListrakForbiddenError) as cm:
-            check_credentials_are_authorized(ctx)
-        self.assertIn("403", str(cm.exception))
+        result = check_credentials_are_authorized(ctx)
+        self.assertIsNone(result)
 
     def test_raises_forbidden_on_fault(self):
         ctx = self._make_ctx(fault=Fault("Access denied"))
@@ -511,24 +510,24 @@ class TestDiscoverAccessChecks(unittest.TestCase):
         self.assertEqual(stream_ids, set(schemas.stream_ids))
 
     @patch('tap_listrak.schemas.load_schema')
-    def test_raises_when_no_lists_in_account(self, mock_load_schema):
-        """Empty GetContactListCollection raises ListrakForbiddenError."""
+    def test_lists_only_when_no_lists_in_account(self, mock_load_schema):
+        """Empty GetContactListCollection keeps lists and excludes dependent streams."""
         mock_load_schema.return_value = self._SIMPLE_SCHEMA
         ctx = MagicMock()
         ctx.client.service.GetContactListCollection.return_value = []
-        with self.assertRaises(ListrakForbiddenError) as cm:
-            discover(ctx)
-        self.assertIn("403", str(cm.exception))
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        self.assertEqual(stream_ids, {'lists'})
 
     @patch('tap_listrak.schemas.load_schema')
     def test_schema_loaded_only_for_accessible_streams(self, mock_load_schema):
         mock_load_schema.return_value = self._SIMPLE_SCHEMA
         ctx = self._make_ctx(fault_on_messages=True)
-        discover(ctx)
-        loaded = {c[0][0] for c in mock_load_schema.call_args_list}
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
         for excluded in ('messages', 'message_clicks', 'message_opens', 'message_reads',
                          'message_sends', 'message_unsubs', 'message_bounces'):
-            self.assertNotIn(excluded, loaded)
+            self.assertNotIn(excluded, stream_ids)
 
 
     @patch('tap_listrak.schemas.load_schema')
@@ -540,13 +539,13 @@ class TestDiscoverAccessChecks(unittest.TestCase):
 
     @patch('tap_listrak.schemas.load_schema')
     def test_discover_loads_schema_only_for_accessible_streams(self, mock_load_schema):
-        """Schema is loaded only for streams that remain in the catalog."""
+        """Only accessible streams remain in the catalog after access checks."""
         mock_load_schema.return_value = self._SIMPLE_SCHEMA
         ctx = self._make_ctx(fault_on_messages=True)
-        discover(ctx)
-        loaded_ids = {call[0][0] for call in mock_load_schema.call_args_list}
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
         for excluded in ('messages', 'message_clicks', 'message_opens',
                          'message_reads', 'message_sends', 'message_unsubs',
                          'message_bounces'):
-            self.assertNotIn(excluded, loaded_ids)
+            self.assertNotIn(excluded, stream_ids)
 

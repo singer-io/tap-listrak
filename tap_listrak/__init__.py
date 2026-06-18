@@ -35,10 +35,55 @@ _MESSAGE_SUBSTREAM_ENDPOINTS = {
 }
 
 
+def _log_unauthorized_stream(stream_name, exc):
+    LOGGER.warning(
+        "Excluding unauthorized stream '%s' from catalog. HTTP-Error-Message: '%s'",
+        stream_name,
+        str(exc)
+    )
+
+
+def _build_catalog_metadata(schema_dict, tap_stream_id):
+    mdata = metadata.get_standard_metadata(
+        schema_dict,
+        replication_method=schemas.REPLICATION_METHODS[tap_stream_id],
+        key_properties=schemas.PK_FIELDS[tap_stream_id]
+    )
+    mdata = metadata.to_map(mdata)
+
+    # `lists` and `messages` are required for their substreams.
+    if tap_stream_id in ['lists', 'messages']:
+        mdata = metadata.write(mdata, (), 'inclusion', 'automatic')
+
+    for field_name in schema_dict['properties'].keys():
+        mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
+
+    if parent_stream := STREAM_DEPENDENCIES.get(tap_stream_id):
+        mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_stream)
+
+    return mdata
+
+
+def get_schemas_with_metadata():
+    """
+    Return stream schemas and stream metadata keyed by stream id.
+    """
+    schema_map = {}
+    field_metadata = {}
+
+    for tap_stream_id in schemas.stream_ids:
+        schema_dict = schemas.load_schema(tap_stream_id)
+        schema_map[tap_stream_id] = schema_dict
+        field_metadata[tap_stream_id] = _build_catalog_metadata(schema_dict, tap_stream_id)
+
+    return schema_map, field_metadata
+
+
 def check_credentials_are_authorized(ctx):
     """
     Probe the 'lists' stream via GetContactListCollection.
-    Returns the first ListID from the response, or None if the account has no lists.
+    Returns the first ListID from the response, or None when the account has
+    no lists but the credentials are still authorized for the stream.
     Raises ListrakForbiddenError if credentials lack read access.
     """
     try:
@@ -46,16 +91,18 @@ def check_credentials_are_authorized(ctx):
         LOGGER.info("Stream 'lists' is accessible.")
         lists = response or []
         if not lists:
-            raise ListrakForbiddenError(
-                "HTTP-error-code: 403, Error: Credentials are valid but "
-                "no lists were found in the account."
+            LOGGER.warning(
+                "Stream 'lists' is accessible, but the account has no lists. "
+                "Excluding dependent streams from catalog because no ListID is available."
             )
+            return None
         return lists[0].ListID
-    except Fault as e:
+    except Fault as exc:
+        _log_unauthorized_stream('lists', exc)
         raise ListrakForbiddenError(
             "HTTP-error-code: 403, Error: The credentials do not have "
-            "'read' access to any supported streams: %s" % e
-        ) from e
+            "'read' access to stream 'lists'. HTTP-Error-Message: '%s'" % str(exc)
+        ) from exc
 
 
 def _probe_list_dependent(ctx, stream_id, list_id):
@@ -63,8 +110,6 @@ def _probe_list_dependent(ctx, stream_id, list_id):
     Probe 'messages' or 'subscribed_contacts' using a real ListID.
     Uses a 365-day look-back to maximise the chance of finding message data.
     Returns (is_accessible, msg_id_or_None).
-      - For 'messages': msg_id is the first MsgID found in the response (or None).
-      - For 'subscribed_contacts': msg_id is always None.
     """
     now = pendulum.now("UTC")
     start = now.subtract(days=365)
@@ -83,18 +128,18 @@ def _probe_list_dependent(ctx, stream_id, list_id):
             except (TypeError, KeyError, IndexError):
                 pass
             return True, msg_id
-        elif stream_id == 'subscribed_contacts':
+
+        if stream_id == 'subscribed_contacts':
             ctx.client.service.ReportRangeSubscribedContacts(
                 ListID=list_id, StartDate=start, EndDate=now, Page=1
             )
             LOGGER.info("Stream 'subscribed_contacts' is accessible.")
             return True, None
-    except Fault as e:
-        LOGGER.warning(
-            "Stream '%s' does not have read permission, excluding from catalog: %s",
-            stream_id, e,
-        )
+    except Fault as exc:
+        _log_unauthorized_stream(stream_id, exc)
         return False, None
+
+    return False, None
 
 
 def _probe_message_substream(ctx, stream_id, msg_id):
@@ -112,109 +157,115 @@ def _probe_message_substream(ctx, stream_id, msg_id):
         getattr(ctx.client.service, endpoint)(**kwargs)
         LOGGER.info("Stream '%s' is accessible.", stream_id)
         return True
-    except Fault as e:
-        LOGGER.warning(
-            "Stream '%s' does not have read permission, excluding from catalog: %s",
-            stream_id, e,
-        )
+    except Fault as exc:
+        _log_unauthorized_stream(stream_id, exc)
         return False
 
 
-def _prune_inaccessible_children(stream_ids, inaccessible):
+def _prune_inaccessible_children(schema_map, field_metadata):
     """
-    Cascade-remove child streams whose parent was marked inaccessible.
-    Used when messages was blocked (without a MsgID probe) to ensure
-    all message_* streams are also removed.
-    Runs iteratively to handle multi-level chains.
+    Remove child streams when their parent stream is excluded.
+    Mutates schema_map and field_metadata in place.
     """
     changed = True
     while changed:
         changed = False
         for child, parent in STREAM_DEPENDENCIES.items():
-            if child in stream_ids and parent not in stream_ids:
+            if child in schema_map and parent not in schema_map:
                 LOGGER.warning(
                     "Stream '%s' excluded from catalog because its parent "
                     "stream '%s' is not accessible.",
-                    child, parent,
+                    child,
+                    parent,
                 )
-                stream_ids.discard(child)
-                inaccessible.add(child)
+                schema_map.pop(child, None)
+                field_metadata.pop(child, None)
                 changed = True
 
 
-def discover(ctx):
-    inaccessible = set()
-    accessible_stream_ids = set(schemas.stream_ids)
+def _apply_access_checks(ctx, schema_map, field_metadata):
+    """
+    Probe stream access and remove inaccessible streams from discovery output.
+    Mutates schema_map and field_metadata in place.
+    """
+    inaccessible_streams = []
 
-    # Step 1: probe 'lists' — raises immediately if inaccessible or empty.
+    # Step 1: probe `lists`.
     list_id = check_credentials_are_authorized(ctx)
 
-    # Step 2: probe 'messages' and 'subscribed_contacts' with the ListID.
+    if list_id is None:
+        for stream_id in ('messages', 'subscribed_contacts'):
+            if stream_id in schema_map:
+                schema_map.pop(stream_id, None)
+                field_metadata.pop(stream_id, None)
+        _prune_inaccessible_children(schema_map, field_metadata)
+        return
+
+    # Step 2: probe list-dependent streams.
     messages_accessible, msg_id = _probe_list_dependent(ctx, 'messages', list_id)
-    if not messages_accessible:
-        accessible_stream_ids.discard('messages')
-        inaccessible.add('messages')
-        _prune_inaccessible_children(accessible_stream_ids, inaccessible)
+    if not messages_accessible and 'messages' in schema_map:
+        inaccessible_streams.append('messages')
+        schema_map.pop('messages', None)
+        field_metadata.pop('messages', None)
 
-    sc_accessible, _ = _probe_list_dependent(ctx, 'subscribed_contacts', list_id)
-    if not sc_accessible:
-        accessible_stream_ids.discard('subscribed_contacts')
-        inaccessible.add('subscribed_contacts')
+    contacts_accessible, _ = _probe_list_dependent(ctx, 'subscribed_contacts', list_id)
+    if not contacts_accessible and 'subscribed_contacts' in schema_map:
+        inaccessible_streams.append('subscribed_contacts')
+        schema_map.pop('subscribed_contacts', None)
+        field_metadata.pop('subscribed_contacts', None)
 
-    # Step 3: probe message_* sub-streams with the MsgID.
+    # Step 3: probe message sub-streams when we have a probe MsgID.
     if messages_accessible and msg_id is not None:
         for stream_id in _MESSAGE_SUBSTREAM_ENDPOINTS:
-            if not _probe_message_substream(ctx, stream_id, msg_id):
-                accessible_stream_ids.discard(stream_id)
-                inaccessible.add(stream_id)
+            if stream_id in schema_map and not _probe_message_substream(ctx, stream_id, msg_id):
+                inaccessible_streams.append(stream_id)
+                schema_map.pop(stream_id, None)
+                field_metadata.pop(stream_id, None)
     elif messages_accessible:
         LOGGER.warning(
             "No messages found in account history; message_* sub-streams "
             "included in catalog without access check."
         )
 
-    if inaccessible:
+    _prune_inaccessible_children(schema_map, field_metadata)
+
+    if not schema_map:
+        raise ListrakForbiddenError(
+            "HTTP-error-code: 403, Error: The credentials do not have 'read' "
+            "access to any supported streams."
+        )
+
+    if inaccessible_streams:
         LOGGER.warning(
             "No 'read' access to stream(s): %s. Excluded from catalog.",
-            ", ".join(sorted(inaccessible)),
+            ", ".join(sorted(set(inaccessible_streams))),
         )
+
+
+def discover(ctx):
+    """
+    Run discovery and exclude inaccessible streams from the generated catalog.
+    """
+    schema_map, field_metadata = get_schemas_with_metadata()
+    _apply_access_checks(ctx, schema_map, field_metadata)
 
     catalog = Catalog([])
-
     for tap_stream_id in schemas.stream_ids:
-        if tap_stream_id not in accessible_stream_ids:
+        if tap_stream_id not in schema_map:
             continue
 
-        schema_dict = schemas.load_schema(tap_stream_id)
+        schema_dict = schema_map[tap_stream_id]
         schema = Schema.from_dict(schema_dict)
-
-        mdata = metadata.get_standard_metadata(
-            schema_dict,
-            replication_method=schemas.REPLICATION_METHODS[tap_stream_id],
-            key_properties=schemas.PK_FIELDS[tap_stream_id]
-        )
-
-        mdata = metadata.to_map(mdata)
-
-        # NB: `lists` and `messages` are required for their substreams.
-        # This is an approximation of the initial functionality using
-        # metadata, which marked them as `selected=True` in the schema.
-        if tap_stream_id in ['lists', 'messages']:
-            mdata = metadata.write(mdata, (), 'inclusion', 'automatic')
-
-        for field_name in schema_dict['properties'].keys():
-            mdata = metadata.write(mdata, ('properties', field_name), 'inclusion', 'automatic')
-
-        if parent_stream := STREAM_DEPENDENCIES.get(tap_stream_id):
-            mdata = metadata.write(mdata, (), 'parent-tap-stream-id', parent_stream)
+        mdata = field_metadata[tap_stream_id]
 
         catalog.streams.append(CatalogEntry(
             stream=tap_stream_id,
             tap_stream_id=tap_stream_id,
             key_properties=schemas.PK_FIELDS[tap_stream_id],
             schema=schema,
-            metadata = metadata.to_list(mdata)
+            metadata=metadata.to_list(mdata)
         ))
+
     return catalog
 
 
