@@ -4,8 +4,6 @@ from zeep.exceptions import Fault
 from tap_listrak import schemas, discover
 from tap_listrak.__init__ import (
     check_credentials_are_authorized,
-    _probe_list_dependent,
-    _probe_message_substream,
     _MESSAGE_SUBSTREAM_ENDPOINTS,
 )
 from tap_listrak.http import ListrakForbiddenError
@@ -349,7 +347,7 @@ class TestCheckCredentialsAuthorized(unittest.TestCase):
         result = check_credentials_are_authorized(ctx)
         self.assertEqual(result, 7)
 
-    def test_raises_when_lists_empty(self):
+    def test_returns_none_when_lists_empty(self):
         ctx = MagicMock()
         ctx.client.service.GetContactListCollection.return_value = []
         result = check_credentials_are_authorized(ctx)

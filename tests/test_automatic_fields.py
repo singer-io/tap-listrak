@@ -16,6 +16,15 @@ class ListrakAutomaticFieldsTest(ListrakBaseTest, unittest.TestCase):
         """Helper to run discover with a mocked Context."""
         ctx = MagicMock(spec=Context)
         ctx.client = MagicMock()  # allow SOAP probe call in discover()
+        # Stub minimal SOAP responses for deterministic testing
+        mock_list = MagicMock()
+        mock_list.ListID = 1
+        ctx.client.service.GetContactListCollection.return_value = [mock_list]
+        mock_msg = MagicMock()
+        mock_msg.__getitem__ = lambda s, k: 1 if k == 'MsgID' else None
+        ctx.client.service.ReportListMessageActivity.return_value = {
+            'ReportListMessageActivityResult': {'WSMessageActivity': [mock_msg]}
+        }
         ctx.config = self.get_mock_config()
         return discover(ctx)
 
