@@ -167,6 +167,7 @@ def _prune_inaccessible_children(schema_map, field_metadata):
     Remove child streams when their parent stream is excluded.
     Mutates schema_map and field_metadata in place.
     """
+    pruned_children = []
     changed = True
     while changed:
         changed = False
@@ -180,7 +181,10 @@ def _prune_inaccessible_children(schema_map, field_metadata):
                 )
                 schema_map.pop(child, None)
                 field_metadata.pop(child, None)
+                pruned_children.append(child)
                 changed = True
+
+    return pruned_children
 
 
 def _apply_access_checks(ctx, schema_map, field_metadata):
@@ -227,7 +231,7 @@ def _apply_access_checks(ctx, schema_map, field_metadata):
             "included in catalog without access check."
         )
 
-    _prune_inaccessible_children(schema_map, field_metadata)
+    inaccessible_streams.extend(_prune_inaccessible_children(schema_map, field_metadata))
 
     if not schema_map:
         raise ListrakForbiddenError(
@@ -237,7 +241,7 @@ def _apply_access_checks(ctx, schema_map, field_metadata):
 
     if inaccessible_streams:
         LOGGER.warning(
-            "No 'read' access to stream(s): %s. Excluded from catalog.",
+            "Unauthorized streams excluded from catalog: %s",
             ", ".join(sorted(set(inaccessible_streams))),
         )
 

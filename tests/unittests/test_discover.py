@@ -3,6 +3,8 @@ from unittest.mock import MagicMock, patch
 from zeep.exceptions import Fault
 from tap_listrak import schemas, discover
 from tap_listrak.__init__ import (
+    _apply_access_checks,
+    _log_unauthorized_stream,
     check_credentials_are_authorized,
     _MESSAGE_SUBSTREAM_ENDPOINTS,
 )
@@ -461,6 +463,47 @@ class TestDiscoverAccessChecks(unittest.TestCase):
         self.assertNotIn('message_clicks', stream_ids)
         self.assertIn('message_opens', stream_ids)
         self.assertIn('messages', stream_ids)
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_logs_sorted_unauthorized_streams_excluded_message(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(
+            fault_on_message_substreams=['message_opens', 'message_bounces']
+        )
+
+        with self.assertLogs(level='WARNING') as captured_logs:
+            discover(ctx)
+
+        self.assertIn(
+            'Unauthorized streams excluded from catalog: '
+            'message_bounces, message_opens',
+            '\n'.join(captured_logs.output),
+        )
+
+    def test_raises_error_when_no_supported_streams_are_accessible(self):
+        schema_map = {'messages': self._SIMPLE_SCHEMA}
+        field_metadata = {'messages': {}}
+
+        with patch('tap_listrak.check_credentials_are_authorized', return_value=42), \
+                patch('tap_listrak._probe_list_dependent', return_value=(False, None)):
+            with self.assertRaises(ListrakForbiddenError) as raised:
+                _apply_access_checks(MagicMock(), schema_map, field_metadata)
+
+        self.assertEqual(
+            str(raised.exception),
+            "HTTP-error-code: 403, Error: The credentials do not have 'read' "
+            "access to any supported streams.",
+        )
+
+    def test_logs_unauthorized_stream_with_fault_message(self):
+        with self.assertLogs(level='WARNING') as captured_logs:
+            _log_unauthorized_stream('message_clicks', Fault('No click access'))
+
+        self.assertIn(
+            "Excluding unauthorized stream 'message_clicks' from catalog. "
+            "HTTP-Error-Message: 'No click access'",
+            '\n'.join(captured_logs.output),
+        )
 
     @patch('tap_listrak.schemas.load_schema')
     def test_messages_probed_with_correct_list_id(self, mock_load_schema):
