@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.0
+  * Exclude 403-forbidden streams from discovery [#36](https://github.com/singer-io/tap-listrak/pull/36)
+  * Bump dependencies for compliance
+
 ## 1.3.1
   * Fix for timezone aware comparisons. [#32](https://github.com/singer-io/tap-listrak/pull/32)
   * Fixes `sync_messages` to handle `WSMessageActivity` being `None` or an empty list inside a truthy `ReportListMessageActivityResult`, preventing `TypeError` and `ValueError` crashes.

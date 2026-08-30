@@ -1,8 +1,21 @@
 import unittest
 from unittest.mock import MagicMock, patch
+from zeep.exceptions import Fault
 from tap_listrak import schemas, discover
-from tap_listrak.context import Context
+from tap_listrak.__init__ import (
+    _apply_access_checks,
+    _log_unauthorized_stream,
+    check_credentials_are_authorized,
+    _MESSAGE_SUBSTREAM_ENDPOINTS,
+)
+from tap_listrak.http import ListrakForbiddenError
 from singer import metadata
+
+
+# ---------------------------------------------------------------------------
+# Note: existing catalog-structure test classes use MagicMock() (no spec) so
+# that ctx.client is auto-created and the SOAP probe in discover() succeeds.
+# ---------------------------------------------------------------------------
 
 
 class TestDiscoverMetadata(unittest.TestCase):
@@ -10,7 +23,7 @@ class TestDiscoverMetadata(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        self.ctx = MagicMock(spec=Context)
+        self.ctx = MagicMock()  # no spec: client attribute auto-created for SOAP probe
         self.ctx.config = {
             'start_date': '2026-01-01T00:00:00Z',
             'username': 'test_user',
@@ -265,7 +278,7 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             'properties': {'id': {'type': 'integer'}}
         }
 
-        ctx = MagicMock(spec=Context)
+        ctx = MagicMock()  # no spec: client auto-created for SOAP probe
         catalog = discover(ctx)
 
         # lists has no parent
@@ -291,7 +304,7 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             'properties': {'id': {'type': 'integer'}}
         }
 
-        ctx = MagicMock(spec=Context)
+        ctx = MagicMock()  # no spec: client auto-created for SOAP probe
         catalog = discover(ctx)
 
         # lists and messages should have automatic inclusion
@@ -313,4 +326,267 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
             # The stream-level inclusion should be None or 'available'
             self.assertNotEqual(inclusion, 'automatic',
                               f"{stream_id} should not have automatic stream-level inclusion")
+
+
+# ---------------------------------------------------------------------------
+# Tests for check_credentials_are_authorized
+# ---------------------------------------------------------------------------
+
+class TestCheckCredentialsAuthorized(unittest.TestCase):
+
+    def _make_ctx(self, fault=None, list_id=42):
+        ctx = MagicMock()
+        if fault:
+            ctx.client.service.GetContactListCollection.side_effect = fault
+        else:
+            mock_list = MagicMock()
+            mock_list.ListID = list_id
+            ctx.client.service.GetContactListCollection.return_value = [mock_list]
+        return ctx
+
+    def test_returns_list_id_when_lists_accessible(self):
+        ctx = self._make_ctx(list_id=7)
+        result = check_credentials_are_authorized(ctx)
+        self.assertEqual(result, 7)
+
+    def test_returns_none_when_lists_empty(self):
+        ctx = MagicMock()
+        ctx.client.service.GetContactListCollection.return_value = []
+        result = check_credentials_are_authorized(ctx)
+        self.assertIsNone(result)
+
+    def test_raises_forbidden_on_fault(self):
+        ctx = self._make_ctx(fault=Fault("Access denied"))
+        with self.assertRaises(ListrakForbiddenError):
+            check_credentials_are_authorized(ctx)
+
+    def test_forbidden_error_contains_403_and_fault_message(self):
+        ctx = self._make_ctx(fault=Fault("InvalidLogonAttempt"))
+        with self.assertRaises(ListrakForbiddenError) as cm:
+            check_credentials_are_authorized(ctx)
+        self.assertIn("403", str(cm.exception))
+        self.assertIn("InvalidLogonAttempt", str(cm.exception))
+
+    def test_probes_get_contact_list_collection(self):
+        ctx = self._make_ctx()
+        check_credentials_are_authorized(ctx)
+        ctx.client.service.GetContactListCollection.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Tests for discover() access-check integration
+# ---------------------------------------------------------------------------
+
+class TestDiscoverAccessChecks(unittest.TestCase):
+
+    _SIMPLE_SCHEMA = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
+
+    def _make_ctx(self, fault_on_lists=False, fault_on_messages=False,
+                  fault_on_subscribed_contacts=False,
+                  fault_on_message_substreams=None, list_id=42, msg_id=77):
+        """
+        Build a mock context with configurable fault injection.
+        GetContactListCollection returns one list with ListID=list_id.
+        ReportListMessageActivity returns a response containing msg_id.
+        """
+        ctx = MagicMock()
+        if fault_on_lists:
+            ctx.client.service.GetContactListCollection.side_effect = Fault("Access denied")
+        else:
+            mock_list = MagicMock()
+            mock_list.ListID = list_id
+            ctx.client.service.GetContactListCollection.return_value = [mock_list]
+
+        if fault_on_messages:
+            ctx.client.service.ReportListMessageActivity.side_effect = Fault("Access denied")
+        else:
+            mock_msg = MagicMock()
+            mock_msg.__getitem__ = lambda s, k: msg_id if k == 'MsgID' else None
+            ctx.client.service.ReportListMessageActivity.return_value = {
+                'ReportListMessageActivityResult': {'WSMessageActivity': [mock_msg]}
+            }
+
+        if fault_on_subscribed_contacts:
+            ctx.client.service.ReportRangeSubscribedContacts.side_effect = Fault("Access denied")
+
+        for stream_id, endpoint in _MESSAGE_SUBSTREAM_ENDPOINTS.items():
+            if stream_id in (fault_on_message_substreams or []):
+                getattr(ctx.client.service, endpoint).side_effect = Fault("Access denied")
+
+        return ctx
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_all_streams_included_when_all_accessible(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx()
+        catalog = discover(ctx)
+        self.assertEqual(
+            {s.tap_stream_id for s in catalog.streams}, set(schemas.stream_ids)
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_raises_when_lists_inaccessible(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(fault_on_lists=True)
+        with self.assertRaises(ListrakForbiddenError) as cm:
+            discover(ctx)
+        self.assertIn("403", str(cm.exception))
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_messages_and_all_substreams_excluded_when_messages_forbidden(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(fault_on_messages=True)
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        for excluded in ('messages', 'message_clicks', 'message_opens', 'message_reads',
+                         'message_sends', 'message_unsubs', 'message_bounces'):
+            self.assertNotIn(excluded, stream_ids)
+        self.assertIn('lists', stream_ids)
+        self.assertIn('subscribed_contacts', stream_ids)
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_subscribed_contacts_excluded_when_forbidden(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(fault_on_subscribed_contacts=True)
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        self.assertNotIn('subscribed_contacts', stream_ids)
+        self.assertIn('lists', stream_ids)
+        self.assertIn('messages', stream_ids)
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_individual_message_substream_excluded_when_forbidden(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(fault_on_message_substreams=['message_clicks'])
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        self.assertNotIn('message_clicks', stream_ids)
+        self.assertIn('message_opens', stream_ids)
+        self.assertIn('messages', stream_ids)
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_logs_sorted_unauthorized_streams_excluded_message(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(
+            fault_on_message_substreams=['message_opens', 'message_bounces']
+        )
+
+        with self.assertLogs(level='WARNING') as captured_logs:
+            discover(ctx)
+
+        self.assertIn(
+            'Unauthorized streams excluded from catalog: '
+            'message_bounces, message_opens',
+            '\n'.join(captured_logs.output),
+        )
+
+    def test_raises_error_when_no_supported_streams_are_accessible(self):
+        schema_map = {'messages': self._SIMPLE_SCHEMA}
+        field_metadata = {'messages': {}}
+
+        with patch('tap_listrak.check_credentials_are_authorized', return_value=42), \
+                patch('tap_listrak._probe_list_dependent', return_value=(False, None)):
+            with self.assertRaises(ListrakForbiddenError) as raised:
+                _apply_access_checks(MagicMock(), schema_map, field_metadata)
+
+        self.assertEqual(
+            str(raised.exception),
+            "HTTP-error-code: 403, Error: The credentials do not have 'read' "
+            "access to any supported streams.",
+        )
+
+    def test_logs_unauthorized_stream_with_fault_message(self):
+        with self.assertLogs(level='WARNING') as captured_logs:
+            _log_unauthorized_stream('message_clicks', Fault('No click access'))
+
+        self.assertIn(
+            "Excluding unauthorized stream 'message_clicks' from catalog. "
+            "HTTP-Error-Message: 'No click access'",
+            '\n'.join(captured_logs.output),
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_messages_probed_with_correct_list_id(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(list_id=99)
+        discover(ctx)
+        self.assertEqual(
+            ctx.client.service.ReportListMessageActivity.call_args[1]['ListID'], 99
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_subscribed_contacts_probed_with_correct_list_id(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(list_id=99)
+        discover(ctx)
+        self.assertEqual(
+            ctx.client.service.ReportRangeSubscribedContacts.call_args[1]['ListID'], 99
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_message_substreams_probed_with_correct_msg_id(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(msg_id=55)
+        discover(ctx)
+        for stream_id, endpoint in _MESSAGE_SUBSTREAM_ENDPOINTS.items():
+            svc = getattr(ctx.client.service, endpoint)
+            self.assertEqual(
+                svc.call_args[1]['MsgID'], 55,
+                f"{stream_id} should be probed with MsgID=55"
+            )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_message_substreams_skipped_when_no_msg_id(self, mock_load_schema):
+        """If messages returns no data, message_* probes are skipped and streams kept."""
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = MagicMock()
+        mock_list = MagicMock()
+        mock_list.ListID = 1
+        ctx.client.service.GetContactListCollection.return_value = [mock_list]
+        ctx.client.service.ReportListMessageActivity.return_value = {
+            'ReportListMessageActivityResult': None
+        }
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        self.assertEqual(stream_ids, set(schemas.stream_ids))
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_lists_only_when_no_lists_in_account(self, mock_load_schema):
+        """Empty GetContactListCollection keeps lists and excludes dependent streams."""
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = MagicMock()
+        ctx.client.service.GetContactListCollection.return_value = []
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        self.assertEqual(stream_ids, {'lists'})
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_schema_loaded_only_for_accessible_streams(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(fault_on_messages=True)
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        for excluded in ('messages', 'message_clicks', 'message_opens', 'message_reads',
+                         'message_sends', 'message_unsubs', 'message_bounces'):
+            self.assertNotIn(excluded, stream_ids)
+
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_probes_lists_endpoint(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx()
+        discover(ctx)
+        ctx.client.service.GetContactListCollection.assert_called_once()
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_discover_loads_schema_only_for_accessible_streams(self, mock_load_schema):
+        """Only accessible streams remain in the catalog after access checks."""
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx(fault_on_messages=True)
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+        for excluded in ('messages', 'message_clicks', 'message_opens',
+                         'message_reads', 'message_sends', 'message_unsubs',
+                         'message_bounces'):
+            self.assertNotIn(excluded, stream_ids)
 

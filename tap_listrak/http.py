@@ -8,6 +8,11 @@ LOGGER = singer.get_logger()
 
 WSDL = "https://webservices.listrak.com/v31/IntegrationService.asmx?wsdl"
 
+
+class ListrakForbiddenError(Exception):
+    """Raised when SOAP credentials lack read access to a Listrak stream."""
+
+
 def get_client(config):
     client = zeep.Client(wsdl=WSDL)
     elem = client.get_element("{http://webservices.listrak.com/v31/}WSUser")
