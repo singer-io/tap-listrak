@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.3.2
+  * Bump singer-python, requests, zeep [#39](https://github.com/singer-io/tap-listrak/pull/39)
+
 ## 1.3.1
   * Fix for timezone aware comparisons. [#32](https://github.com/singer-io/tap-listrak/pull/32)
   * Fixes `sync_messages` to handle `WSMessageActivity` being `None` or an empty list inside a truthy `ReportListMessageActivityResult`, preventing `TypeError` and `ValueError` crashes.
