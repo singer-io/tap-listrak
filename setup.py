@@ -12,7 +12,7 @@ setup(
     install_requires=[
         "singer-python==6.8.0",
         "requests==2.34.2",
-        "zeep==4.3.2",
+        "zeep==4.3.3",
         'backoff==2.2.1',
         'pendulum==3.2.0'
     ],
