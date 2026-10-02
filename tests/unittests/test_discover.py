@@ -334,6 +334,16 @@ class TestStreamDependencyHierarchy(unittest.TestCase):
 
 class TestCheckCredentialsAuthorized(unittest.TestCase):
 
+    def setUp(self):
+        # check_credentials_are_authorized now routes through http.request(),
+        # which retries via backoff; patch sleep so retries don't slow tests.
+        sleep_patcher = patch("time.sleep", return_value=None)
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+        fileconfig_patcher = patch("logging.config.fileConfig")
+        fileconfig_patcher.start()
+        self.addCleanup(fileconfig_patcher.stop)
+
     def _make_ctx(self, fault=None, list_id=42):
         ctx = MagicMock()
         if fault:
@@ -381,6 +391,19 @@ class TestDiscoverAccessChecks(unittest.TestCase):
 
     _SIMPLE_SCHEMA = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
 
+    def setUp(self):
+        # _probe_list_dependent / _probe_message_substream now route through
+        # http.request(), which retries via backoff; patch sleep so retries
+        # don't slow tests down. Also prevent singer.get_logger() (called by
+        # metrics.http_request_timer on every request) from reloading
+        # logging.conf mid-test, which would wipe out assertLogs' handler.
+        sleep_patcher = patch("time.sleep", return_value=None)
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+        fileconfig_patcher = patch("logging.config.fileConfig")
+        fileconfig_patcher.start()
+        self.addCleanup(fileconfig_patcher.stop)
+
     def _make_ctx(self, fault_on_lists=False, fault_on_messages=False,
                   fault_on_subscribed_contacts=False,
                   fault_on_message_substreams=None, list_id=42, msg_id=77):
@@ -388,17 +411,23 @@ class TestDiscoverAccessChecks(unittest.TestCase):
         Build a mock context with configurable fault injection.
         GetContactListCollection returns one list with ListID=list_id.
         ReportListMessageActivity returns a response containing msg_id.
+
+        Faults injected here use the 'InvalidLogonAttempt' marker, which is
+        the repository's known signal for a genuine authorization failure
+        (see `is_authorization_fault`). Generic/operational faults are
+        covered separately below and are expected to be retried and then
+        propagated rather than pruning the stream.
         """
         ctx = MagicMock()
         if fault_on_lists:
-            ctx.client.service.GetContactListCollection.side_effect = Fault("Access denied")
+            ctx.client.service.GetContactListCollection.side_effect = Fault("InvalidLogonAttempt")
         else:
             mock_list = MagicMock()
             mock_list.ListID = list_id
             ctx.client.service.GetContactListCollection.return_value = [mock_list]
 
         if fault_on_messages:
-            ctx.client.service.ReportListMessageActivity.side_effect = Fault("Access denied")
+            ctx.client.service.ReportListMessageActivity.side_effect = Fault("InvalidLogonAttempt")
         else:
             mock_msg = MagicMock()
             mock_msg.__getitem__ = lambda s, k: msg_id if k == 'MsgID' else None
@@ -407,11 +436,11 @@ class TestDiscoverAccessChecks(unittest.TestCase):
             }
 
         if fault_on_subscribed_contacts:
-            ctx.client.service.ReportRangeSubscribedContacts.side_effect = Fault("Access denied")
+            ctx.client.service.ReportRangeSubscribedContacts.side_effect = Fault("InvalidLogonAttempt")
 
         for stream_id, endpoint in _MESSAGE_SUBSTREAM_ENDPOINTS.items():
             if stream_id in (fault_on_message_substreams or []):
-                getattr(ctx.client.service, endpoint).side_effect = Fault("Access denied")
+                getattr(ctx.client.service, endpoint).side_effect = Fault("InvalidLogonAttempt")
 
         return ctx
 
@@ -589,4 +618,126 @@ class TestDiscoverAccessChecks(unittest.TestCase):
                          'message_reads', 'message_sends', 'message_unsubs',
                          'message_bounces'):
             self.assertNotIn(excluded, stream_ids)
+
+
+# ---------------------------------------------------------------------------
+# Tests for distinguishing operational faults from authorization faults
+# ---------------------------------------------------------------------------
+
+class TestOperationalFaultsVsAuthorizationFaults(unittest.TestCase):
+    """
+    Probes must retry generic/operational SOAP faults (per the repository's
+    request() backoff policy) and propagate them if they persist, instead of
+    silently excluding the stream as if credentials lacked access. Only a
+    known authorization fault (InvalidLogonAttempt) should cause exclusion.
+    """
+
+    _SIMPLE_SCHEMA = {'type': 'object', 'properties': {'ListID': {'type': 'integer'}}}
+    MAX_RETRIES = 5
+
+    def setUp(self):
+        sleep_patcher = patch("time.sleep", return_value=None)
+        self.mock_sleep = sleep_patcher.start()
+        self.addCleanup(sleep_patcher.stop)
+        fileconfig_patcher = patch("logging.config.fileConfig")
+        fileconfig_patcher.start()
+        self.addCleanup(fileconfig_patcher.stop)
+
+    def _make_ctx(self, list_id=42, msg_id=77):
+        ctx = MagicMock()
+        mock_list = MagicMock()
+        mock_list.ListID = list_id
+        ctx.client.service.GetContactListCollection.return_value = [mock_list]
+        mock_msg = MagicMock()
+        mock_msg.__getitem__ = lambda s, k: msg_id if k == 'MsgID' else None
+        ctx.client.service.ReportListMessageActivity.return_value = {
+            'ReportListMessageActivityResult': {'WSMessageActivity': [mock_msg]}
+        }
+        return ctx
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_operational_fault_on_messages_is_retried_then_propagated(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx()
+        ctx.client.service.ReportListMessageActivity.side_effect = Fault(
+            "Service temporarily unavailable"
+        )
+
+        with self.assertRaises(Fault):
+            discover(ctx)
+
+        # Retried up to MAX_RETRIES times per http.request()'s backoff policy,
+        # rather than failing fast and silently pruning the 'messages' stream.
+        self.assertEqual(
+            ctx.client.service.ReportListMessageActivity.call_count, self.MAX_RETRIES
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_operational_fault_on_subscribed_contacts_is_retried_then_propagated(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx()
+        ctx.client.service.ReportRangeSubscribedContacts.side_effect = Fault(
+            "Service temporarily unavailable"
+        )
+
+        with self.assertRaises(Fault):
+            discover(ctx)
+
+        self.assertEqual(
+            ctx.client.service.ReportRangeSubscribedContacts.call_count, self.MAX_RETRIES
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_operational_fault_on_message_substream_is_retried_then_propagated(self, mock_load_schema):
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx()
+        endpoint = _MESSAGE_SUBSTREAM_ENDPOINTS['message_clicks']
+        getattr(ctx.client.service, endpoint).side_effect = Fault(
+            "Service temporarily unavailable"
+        )
+
+        with self.assertRaises(Fault):
+            discover(ctx)
+
+        self.assertEqual(
+            getattr(ctx.client.service, endpoint).call_count, self.MAX_RETRIES
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_operational_fault_on_lists_is_retried_then_raises_forbidden(self, mock_load_schema):
+        """
+        check_credentials_are_authorized treats any exhausted Fault as fatal
+        (lists is foundational), but it must still go through the backoff
+        retry policy instead of failing on the very first attempt.
+        """
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = MagicMock()
+        ctx.client.service.GetContactListCollection.side_effect = Fault(
+            "Service temporarily unavailable"
+        )
+
+        with self.assertRaises(ListrakForbiddenError):
+            discover(ctx)
+
+        self.assertEqual(
+            ctx.client.service.GetContactListCollection.call_count, self.MAX_RETRIES
+        )
+
+    @patch('tap_listrak.schemas.load_schema')
+    def test_invalid_logon_attempt_on_message_substream_gives_up_immediately(self, mock_load_schema):
+        """
+        InvalidLogonAttempt is the repository's known authorization-fault
+        signal: it must NOT be retried (backoff gives up immediately) and
+        must still result in the stream being excluded from the catalog.
+        """
+        mock_load_schema.return_value = self._SIMPLE_SCHEMA
+        ctx = self._make_ctx()
+        endpoint = _MESSAGE_SUBSTREAM_ENDPOINTS['message_clicks']
+        getattr(ctx.client.service, endpoint).side_effect = Fault("InvalidLogonAttempt")
+
+        catalog = discover(ctx)
+        stream_ids = {s.tap_stream_id for s in catalog.streams}
+
+        self.assertNotIn('message_clicks', stream_ids)
+        self.assertEqual(getattr(ctx.client.service, endpoint).call_count, 1)
 

@@ -7,7 +7,7 @@ from zeep.exceptions import Fault
 from . import streams as streams_
 from .context import Context
 from . import schemas
-from .http import ListrakForbiddenError
+from .http import ListrakForbiddenError, request, is_authorization_fault
 
 REQUIRED_CONFIG_KEYS = ["start_date", "username", "password"]
 LOGGER = singer.get_logger()
@@ -87,7 +87,7 @@ def check_credentials_are_authorized(ctx):
     Raises ListrakForbiddenError if credentials lack read access.
     """
     try:
-        response = ctx.client.service.GetContactListCollection()
+        response = request('lists', ctx.client.service.GetContactListCollection)
         LOGGER.info("Stream 'lists' is accessible.")
         lists = response or []
         if not lists:
@@ -109,13 +109,18 @@ def _probe_list_dependent(ctx, stream_id, list_id):
     """
     Probe 'messages' or 'subscribed_contacts' using a real ListID.
     Uses a 365-day look-back to maximise the chance of finding message data.
-    Returns (is_accessible, msg_id_or_None).
+    Returns (is_accessible, msg_id_or_None). Operational Faults are retried
+    via `request`; only a known authorization Fault (see `is_authorization_fault`)
+    that persists after retries causes the stream to be excluded. Any other
+    Fault that survives retries is propagated instead of silently pruning
+    the stream from the catalog.
     """
     now = pendulum.now("UTC")
     start = now.subtract(days=365)
     try:
         if stream_id == 'messages':
-            response = ctx.client.service.ReportListMessageActivity(
+            response = request(
+                stream_id, ctx.client.service.ReportListMessageActivity,
                 ListID=list_id, StartDate=start, EndDate=now, IncludeTestMessages=True
             )
             LOGGER.info("Stream 'messages' is accessible.")
@@ -130,14 +135,23 @@ def _probe_list_dependent(ctx, stream_id, list_id):
             return True, msg_id
 
         if stream_id == 'subscribed_contacts':
-            ctx.client.service.ReportRangeSubscribedContacts(
+            request(
+                stream_id, ctx.client.service.ReportRangeSubscribedContacts,
                 ListID=list_id, StartDate=start, EndDate=now, Page=1
             )
             LOGGER.info("Stream 'subscribed_contacts' is accessible.")
             return True, None
     except Fault as exc:
-        _log_unauthorized_stream(stream_id, exc)
-        return False, None
+        if is_authorization_fault(exc):
+            _log_unauthorized_stream(stream_id, exc)
+            return False, None
+        LOGGER.error(
+            "Operational SOAP fault probing stream '%s' persisted after retries; "
+            "this is not a known authorization failure, so it will be propagated "
+            "instead of silently excluding the stream. HTTP-Error-Message: '%s'",
+            stream_id, str(exc)
+        )
+        raise
 
     return False, None
 
@@ -145,7 +159,9 @@ def _probe_list_dependent(ctx, stream_id, list_id):
 def _probe_message_substream(ctx, stream_id, msg_id):
     """
     Probe a message_* sub-stream using a real MsgID.
-    Returns True if accessible, False if a Fault is raised.
+    Returns True if accessible, False if a known authorization Fault
+    (see `is_authorization_fault`) is raised after retries are exhausted.
+    Operational Faults are retried via `request` and re-raised if they persist.
     """
     now = pendulum.now("UTC")
     start = now.subtract(days=365)
@@ -154,12 +170,20 @@ def _probe_message_substream(ctx, stream_id, msg_id):
     if stream_id != 'message_sends':
         kwargs.update({'StartDate': start, 'EndDate': now})
     try:
-        getattr(ctx.client.service, endpoint)(**kwargs)
+        request(stream_id, getattr(ctx.client.service, endpoint), **kwargs)
         LOGGER.info("Stream '%s' is accessible.", stream_id)
         return True
     except Fault as exc:
-        _log_unauthorized_stream(stream_id, exc)
-        return False
+        if is_authorization_fault(exc):
+            _log_unauthorized_stream(stream_id, exc)
+            return False
+        LOGGER.error(
+            "Operational SOAP fault probing stream '%s' persisted after retries; "
+            "this is not a known authorization failure, so it will be propagated "
+            "instead of silently excluding the stream. HTTP-Error-Message: '%s'",
+            stream_id, str(exc)
+        )
+        raise
 
 
 def _prune_inaccessible_children(schema_map, field_metadata):
