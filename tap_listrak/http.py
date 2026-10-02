@@ -8,6 +8,11 @@ LOGGER = singer.get_logger()
 
 WSDL = "https://webservices.listrak.com/v31/IntegrationService.asmx?wsdl"
 
+
+class ListrakForbiddenError(Exception):
+    """Raised when SOAP credentials lack read access to a Listrak stream."""
+
+
 def get_client(config):
     client = zeep.Client(wsdl=WSDL)
     elem = client.get_element("{http://webservices.listrak.com/v31/}WSUser")
@@ -28,6 +33,19 @@ def log_retry_attempt(details):
 def is_non_retriable_exception(exc):
     """Avoid retrying on InvalidLogonAttempt errors."""
     return isinstance(exc, Fault) and "InvalidLogonAttempt" in str(exc)
+
+
+def is_authorization_fault(exc):
+    """
+    Identify SOAP faults that indicate the credentials genuinely lack access
+    (e.g. InvalidLogonAttempt), as opposed to transient/operational faults.
+
+    This is the single source of truth callers should use to decide whether a
+    Fault represents "no access" (safe to exclude a stream from the catalog)
+    versus an operational failure that should instead be retried by `request`
+    and, if it persists, propagated rather than silently pruning streams.
+    """
+    return is_non_retriable_exception(exc)
 
 @backoff.on_exception(
     backoff.expo,
